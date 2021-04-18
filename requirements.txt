@@ -1,0 +1,16 @@
+jupyterlab
+pandas
+networkx
+matplotlib
+ipywidgets
+ipympl
+plotly
+bokeh
+scipy
+scikit-learn
+scikit-multilearn
+seaborn
+sympy
+tqdm
+toolz
+zarr
