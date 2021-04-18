@@ -5,7 +5,9 @@ import pandas as pd
 import toolz
 from sklearn.model_selection import train_test_split
 
-from experiments import GraphData, LayerSplit, binary_classification_metrics
+from sampling import GraphData, LayerSplit
+from reconstruction import ipf
+from experiments.metrics import binary_classification_metrics
 from fao_data import load_dataset
 from utils import node_set
 
@@ -64,20 +66,27 @@ def evaluate_reconstruction(
 
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    
     sample = random_layer_sample()
     sample.print_summary()
     n = sample.n
     
+    print('IPF')
+    ipf_w = ipf.reconstruct_layer_sample(sample)
+    evaluate_reconstruction(sample, ipf_w)
+    
     print('RANDOM')
-    predicted_matrix = np.random.rand(n, n)
+    n_obs = len(sample.observed.nodes)
+    prob = len(sample.hidden.edges) / (n * n - n_obs * n_obs)
+    predicted_matrix = np.random.rand(n, n) * prob
     evaluate_reconstruction(sample, predicted_matrix)
     
-    print('ONES')
-    evaluate_reconstruction(sample, np.ones((n,n)))
+    # print('ONES')
+    # evaluate_reconstruction(sample, np.ones((n,n)))
     
-    print('ZEROS')
-    evaluate_reconstruction(sample, np.zeros((n,n)))
-    
-    # print(sample.observed.edges)
-    # print(sample.observed.nodes)
+    # print('ZEROS')
+    # evaluate_reconstruction(sample, np.zeros((n,n)))
+
     

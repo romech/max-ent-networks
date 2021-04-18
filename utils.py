@@ -1,9 +1,11 @@
 from itertools import chain
 import traceback
-from typing import Set
+from typing import Any, Dict, Iterable, Hashable, Mapping, Optional, Set
 
+import numpy as np
 import pandas as pd
 import toolz
+from scipy.sparse import csr_matrix
 
 
 def replace_underscores(string):
@@ -36,6 +38,53 @@ def node_set(edges: pd.DataFrame,
 
 def node_set_size(edges: pd.DataFrame) -> int:
     return len(node_set(edges))
+
+
+def repeat_col(array: np.ndarray, n: int):
+    return array.reshape(-1, 1).repeat(n, axis=1)
+
+
+def repeat_row(array: np.ndarray, n: int):
+    return array.reshape(1, -1).repeat(n, axis=0)
+
+
+def index_elements(elements: Iterable[Hashable]) -> Dict[Hashable, int]:
+    return {elem: i for i, elem in enumerate(elements)}
+
+
+def edges_to_matrix(edges: pd.DataFrame,
+                    src_index: Mapping[Any, int],
+                    dst_index: Mapping[Any, int],
+                    src_col: str = 'node_1',
+                    dst_col: str = 'node_2',
+                    weight_col: Optional[str] = None) -> csr_matrix:
+    """
+    Create sparse adjaceny/weight matrix given edge DataFrame.
+
+    Args:
+        edges (DataFrame): edge list, either weighted or not.
+        src_index, dst_index (dict-like): mapping from node indices to zero-based index
+        src_col, dst_col (str): column names. Defaults are 'node_1' and 'node_2.
+        weight_col (optional str): set this if weight matrix in needed.
+
+    Returns:
+        adjacency/weight matrix (csr_matrix)
+    """
+    row_indices = [src_index[u] for u in edges[src_col]]
+    col_indices = [dst_index[v] for v in edges[dst_col]]
+    if weight_col is None:
+        weights = [1] * len(edges)
+        dtype = np.int8
+    else:
+        weights = edges[weight_col]
+        dtype = weights.dtype
+    
+    res = csr_matrix(
+        (weights, (row_indices, col_indices)),
+        shape=(len(src_index), len(dst_index)),
+        dtype=dtype
+    )
+    return res
 
 
 def extract_clustered_table(res, data):
