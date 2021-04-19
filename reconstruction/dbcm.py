@@ -13,13 +13,12 @@ Physics Reports, vol. 757, pp. 1–47, Oct. 2018, doi: 10.1016/j.physrep.2018.06
 import logging
 
 import numpy as np
-import toolz
+from scipy.optimize import root_scalar
 from sympy import Symbol
-from sympy.solvers import solve, solveset, S
-from tqdm import trange, tqdm
+from tqdm import tqdm
 
 from sampling import LayerSplit
-from utils import empirical_strengths, index_elements, repeat_col, repeat_row
+from utils import empirical_strengths
 
 
 def reconstruct_layer_sample(
@@ -37,28 +36,45 @@ def reconstruct_layer_sample(
             sample.full.nodes,
             marginalized=marginalized
         )
-
+        
     # Solving eqn. (46) for z
-    # TAKES INFINITE TIME TO COMPLETE
     n = sample.n
-    s_total = s_in.sum() + s_out.sum()
+    s_total = s_in.sum()
     z = Symbol('z')
     numerators = [z * s_out[i] * s_in[j] if i!=j else z * 0
                   for i in range(n)
                   for j in range(n)]
     p_ij = [num / (1 + num) for num in numerators]
-    eqn = sum(tqdm(p_ij, desc='Summing p_ij')) - s_total
-    with tqdm(total=1, desc='Solving eqn for z') as pbar:
-        sol = solve(eqn, z, particular=True, quick=True)
-        pbar.update(1)
-        pbar.set_postfix({'z': str(sol)})
+    rhs = sum(tqdm(p_ij, desc='Summing p_ij', leave=False))
+    lhs = s_total
     
-    print(sol)
+    with tqdm(total=3, desc='Solving eqn for z', unit='step') as pbar:
+        pbar.update()
+        pbar.set_postfix_str('taking primes')
+        rhs_prime = rhs.diff(z)
+        rhs_prime2 = rhs_prime.diff(z)
+        
+        def f(x):
+            return float(lhs - rhs.subs(z, x))
+        
+        def f_prime(x):
+            return float(-rhs_prime.subs(z, x))
+        
+        def f_prime2(x):
+            return float(-rhs_prime2.subs(z, x))
+        
+        pbar.update()
+        for x0 in np.logspace(-5, 1):
+            pbar.set_postfix_str(f'trying x0={x0}')
+            sol = root_scalar(f, x0=x0, fprime=f_prime, fprime2=f_prime2, method='halley', xtol=1e-10)
+            if sol.converged and sol.root > 0:
+                break               
+        pbar.update()
+        
+    logging.debug(sol)
+    if not sol.converged:
+        raise ValueError('Could not solve eqn for z')
     
-    if len(sol) == 0:
-        print('Empty solution')
-        return
-    p_ij = [p.subs(z, sol[0]) for p in p_ij]
+    p_ij = [p.subs(z, sol.root) for p in p_ij]
     p_ij = np.array(p_ij).reshape(n, n)
-    logging.debug(f'z = {sol[0]}')
     return p_ij
