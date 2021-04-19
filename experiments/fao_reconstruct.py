@@ -6,22 +6,36 @@ import toolz
 from sklearn.model_selection import train_test_split
 
 from sampling import GraphData, LayerSplit
-from reconstruction import ipf
+from reconstruction import ipf, random_baseline
 from experiments.metrics import binary_classification_metrics
 from fao_data import load_dataset
-from utils import node_set
+from utils import filter_by_layer, node_set
 
 
-def random_layer_sample(layer_id=None, test_size=0.25, random_state=None) -> LayerSplit:
-    edges, _, layer_names = load_dataset()
+def random_layer_sample(layer_id=None, hidden_ratio=0.25, random_state=None) -> LayerSplit:
+    """
+    Select random layer, then split its nodes into 'observed' and 'hidden' parts.
+    Edges that are adjacent to any hidden node are also considered as 'hidden'.
+
+    Args:
+        layer_id (int, optional): Chosen at random by default.
+        hidden_ratio (float): Ratio of nodes hidden (0.25 by default).
+                              Ratio of hidden edges is essentially larger.
+        random_state (int): Random seed for splitting nodes.
+
+    Returns:
+        LayerSplit: data class containing nodes and edges for each partition:
+                    'observed', 'hidden' and 'full'.
+    """
+    dataset = load_dataset()
     if layer_id is None:
-        layer_id = random.choice(layer_names.index)
+        layer_id = random.choice(dataset.layer_names.index)
     
-    edges = edges[edges.layer_id == layer_id]
+    edges = filter_by_layer(dataset.edges, layer_id)
     nodes = list(node_set(edges))
     nodes_observed, nodes_hidden = train_test_split(
         nodes,
-        test_size=test_size,
+        test_size=hidden_ratio,
         random_state=random_state
     )
     is_hidden_edge = edges.node_1.isin(nodes_hidden) | edges.node_2.isin(nodes_hidden)
@@ -78,15 +92,5 @@ if __name__ == '__main__':
     evaluate_reconstruction(sample, ipf_w)
     
     print('RANDOM')
-    n_obs = len(sample.observed.nodes)
-    prob = len(sample.hidden.edges) / (n * n - n_obs * n_obs)
-    predicted_matrix = np.random.rand(n, n) * prob
-    evaluate_reconstruction(sample, predicted_matrix)
-    
-    # print('ONES')
-    # evaluate_reconstruction(sample, np.ones((n,n)))
-    
-    # print('ZEROS')
-    # evaluate_reconstruction(sample, np.zeros((n,n)))
-
-    
+    random_w = random_baseline.reconstruct_layer_sample(sample)
+    evaluate_reconstruction(sample, random_w)

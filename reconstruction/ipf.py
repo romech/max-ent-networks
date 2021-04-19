@@ -20,7 +20,7 @@ from sampling import LayerSplit
 from utils import index_elements, repeat_col, repeat_row
 
 
-def reconstruct(W, s_in, s_out, max_steps=5, tol=1e-8) -> np.ndarray:
+def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
     """
     Run reconstrution for all or selected nodes, and return a modified weight matrix.
     See chapter 3.1.2 in [1].
@@ -31,12 +31,12 @@ def reconstruct(W, s_in, s_out, max_steps=5, tol=1e-8) -> np.ndarray:
         target_nodes (iterable or none): which nodes to reconstruct (all by default)
     """
     N = len(s_in)
-    W_prev = W.copy()
-    np.fill_diagonal(W_prev, 0)
+    W_n = W.copy()
+    np.fill_diagonal(W_n, 0)
     
     steps_pbar = trange(max_steps, desc='IPF steps', leave=False)
     for step in steps_pbar:
-        W_n = W_prev.copy()
+        W_prev = W_n.copy()
         
         # STEP 1 - s_in. See eqn (15).
         _s_in = W_n.sum(axis=0)
@@ -49,7 +49,6 @@ def reconstruct(W, s_in, s_out, max_steps=5, tol=1e-8) -> np.ndarray:
         _s_out = np.where(s_out > 0, _s_out, 1e-10)
         W_n = repeat_col(s_out, N) * (W_n / repeat_col(_s_out, N))
         
-        W_prev = W_n
         if np.allclose(W_n, W_prev, atol=tol):
             steps_pbar.close()
             logging.debug(f'IPF converged in {step + 1} steps')

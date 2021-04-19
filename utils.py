@@ -1,6 +1,8 @@
-from itertools import chain
 import traceback
-from typing import Any, Dict, Iterable, Hashable, Mapping, Optional, Set
+from collections import abc
+from itertools import chain
+from typing import (Any, Dict, Hashable, Iterable, List, Mapping, Optional,
+                    Set, Tuple, Union)
 
 import numpy as np
 import pandas as pd
@@ -50,6 +52,16 @@ def repeat_row(array: np.ndarray, n: int):
 
 def index_elements(elements: Iterable[Hashable]) -> Dict[Hashable, int]:
     return {elem: i for i, elem in enumerate(elements)}
+
+
+def filter_by_layer(edges: pd.DataFrame, layer_ids: Union[int, str, List, Tuple]) -> pd.DataFrame:
+    if isinstance(layer_ids, (str, int, np.integer)):
+        crit = edges.layer_id == layer_ids
+    elif isinstance(layer_ids, abc.Iterable):
+        crit = edges.layer_id.isin(layer_ids)
+    else:
+        raise ValueError(f'Expected int/str/list for layer_ids parameter, got {type(layer_ids)}')
+    return edges[crit]
 
 
 def edges_to_matrix(edges: pd.DataFrame,
