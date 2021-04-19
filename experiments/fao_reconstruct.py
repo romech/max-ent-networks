@@ -6,7 +6,7 @@ import toolz
 from sklearn.model_selection import train_test_split
 
 from sampling import GraphData, LayerSplit
-from reconstruction import ipf, random_baseline
+from reconstruction import ipf, dbcm, random_baseline
 from experiments.metrics import binary_classification_metrics
 from fao_data import load_dataset
 from utils import filter_by_layer, node_set
@@ -90,6 +90,10 @@ if __name__ == '__main__':
     print('IPF')
     ipf_w = ipf.reconstruct_layer_sample(sample)
     evaluate_reconstruction(sample, ipf_w)
+    
+    print('DBCM')
+    dbcm_w = dbcm.reconstruct_layer_sample(sample)
+    evaluate_reconstruction(sample, dbcm_w)
     
     print('RANDOM')
     random_w = random_baseline.reconstruct_layer_sample(sample)

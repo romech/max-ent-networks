@@ -99,6 +99,19 @@ def edges_to_matrix(edges: pd.DataFrame,
     return res
 
 
+def empirical_strengths(edges, nodes, marginalized=True):
+    if marginalized:
+        strength_func = len
+    else:
+        strength_func = lambda edge_subset: edge_subset['weight'].sum()
+    
+    s_out = edges.groupby('node_1').apply(strength_func)
+    s_out = np.array([s_out.get(u, 0) for u in nodes])
+    s_in = edges.groupby('node_2').apply(strength_func)
+    s_in = np.array([s_in.get(v, 0) for v in nodes])
+    return s_in, s_out
+
+
 def extract_clustered_table(res, data):
     """
     input

@@ -17,7 +17,7 @@ import toolz
 from tqdm import trange
 
 from sampling import LayerSplit
-from utils import index_elements, repeat_col, repeat_row
+from utils import empirical_strengths, index_elements, repeat_col, repeat_row
 
 
 def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
@@ -75,35 +75,30 @@ def reconstruct_layer_sample(
     Returns:
         predictions matrix (N⨯N numpy array)
     """
-    nodes = sample.full.nodes
     
-    if marginalized:
-        strength_func = len
-        weight_func = lambda _: 1
-    else:
-        strength_func = lambda edge_subset: edge_subset['weight'].sum()
-        weight_func = lambda e: e.weight
-        
-    if s_out is None:
-        s_out = sample.full.edges.groupby('node_1').apply(strength_func)
-        s_out = np.array([s_out.get(u, 0) for u in nodes])
     if s_in is None:
-        s_in = sample.full.edges.groupby('node_2').apply(strength_func)
-        s_in = np.array([s_in.get(v, 0) for v in nodes])
-    
+        s_in, s_out = empirical_strengths(
+            sample.full.edges,
+            sample.full.nodes,
+            marginalized=marginalized
+        )
     # IPF requires initial matrix to contain non-zero elements in place of
     # all entries where edges should be predicted. So, we use MaxEnt
     # matrix as an initial solution, and insert the observed part.
     W0 = _W_me(s_in, s_out)
 
+    nodes = sample.full.nodes
     node_index = index_elements(nodes)
     observed_node_ids = toolz.get(sample.observed.nodes, node_index)
     W0[np.ix_(observed_node_ids, observed_node_ids)] = 0
-    
+
     for edge in sample.observed.edges.itertuples():
         u = node_index[edge.node_1]
         v = node_index[edge.node_2]
-        W0[(u, v)] = weight_func(edge)
+        if marginalized:
+            W0[(u, v)] = 1
+        else:
+            W0[(u, v)] = edge.weight
     
     Wn = reconstruct(W0, s_in, s_out)
     return Wn
