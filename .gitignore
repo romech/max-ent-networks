@@ -2,6 +2,7 @@
 .pylintrc
 deliverables
 output
+cbs
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,vscode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,vscode
