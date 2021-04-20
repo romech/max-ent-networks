@@ -14,7 +14,8 @@ import logging
 
 import numpy as np
 from scipy.optimize import root_scalar
-from sympy import Symbol
+from sympy import Add, Symbol
+from toolz import excepts
 from tqdm import tqdm
 
 from sampling import LayerSplit
@@ -36,23 +37,25 @@ def reconstruct_layer_sample(
             sample.full.nodes,
             marginalized=marginalized
         )
+    n = sample.n
         
     # Solving eqn. (46) for z
-    n = sample.n
-    s_total = s_in.sum()
-    z = Symbol('z')
-    numerators = [z * s_out[i] * s_in[j] if i!=j else z * 0
-                  for i in range(n)
-                  for j in range(n)]
-    p_ij = [num / (1 + num) for num in numerators]
-    rhs = sum(tqdm(p_ij, desc='Summing p_ij', leave=False))
-    lhs = s_total
-    
     with tqdm(total=3, desc='Solving eqn for z', unit='step') as pbar:
+        pbar.set_postfix_str('preparing equation')
+        z = Symbol('z')
+        lhs = s_in.sum()
+        numerators = [z * s_out[i] * s_in[j] if i!=j else z * 0
+                      for i in range(n)
+                      for j in range(n)]
+        p_ij = [num / (1 + num) for num in numerators]
+        rhs = Add(*p_ij)
+        
         pbar.update()
         pbar.set_postfix_str('taking primes')
-        rhs_prime = rhs.diff(z)
-        rhs_prime2 = rhs_prime.diff(z)
+        p_ij_pr = [p.diff(z) for p in p_ij]
+        p_ij_pr2 = [p_pr.diff(z) for p_pr in p_ij_pr]
+        rhs_prime = Add(*p_ij_pr)
+        rhs_prime2 = Add(*p_ij_pr2)
         
         def f(x):
             return float(lhs - rhs.subs(z, x))
@@ -63,12 +66,21 @@ def reconstruct_layer_sample(
         def f_prime2(x):
             return float(-rhs_prime2.subs(z, x))
         
+        def nan_fallback(_):
+            return np.nan
+        
         pbar.update()
-        for x0 in np.logspace(-5, 1):
-            pbar.set_postfix_str(f'trying x0={x0}')
-            sol = root_scalar(f, x0=x0, fprime=f_prime, fprime2=f_prime2, method='halley', xtol=1e-10)
+        for x0 in np.logspace(-5, 1, 10):
+            pbar.set_postfix_str(f'trying x0={x0:.1e}')
+            sol = root_scalar(
+                excepts(TypeError, f, nan_fallback),
+                fprime=excepts(TypeError, f_prime, nan_fallback),
+                fprime2=excepts(TypeError, f_prime2, nan_fallback),
+                x0=x0,
+                method='halley',
+                xtol=1e-10)
             if sol.converged and sol.root > 0:
-                break               
+                break
         pbar.update()
         
     logging.debug(sol)
@@ -76,5 +88,5 @@ def reconstruct_layer_sample(
         raise ValueError('Could not solve eqn for z')
     
     p_ij = [p.subs(z, sol.root) for p in p_ij]
-    p_ij = np.array(p_ij).reshape(n, n)
+    p_ij = np.array(p_ij, dtype=np.float32).reshape(n, n)
     return p_ij

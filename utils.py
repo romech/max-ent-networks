@@ -1,3 +1,4 @@
+import re
 import traceback
 from collections import abc
 from itertools import chain
@@ -48,6 +49,19 @@ def repeat_col(array: np.ndarray, n: int):
 
 def repeat_row(array: np.ndarray, n: int):
     return array.reshape(1, -1).repeat(n, axis=0)
+
+
+def probabilies_to_adjacency(matrix):
+    return np.random.rand(*matrix.shape) < matrix
+
+
+def matrix_intersetions(elements, index=None):
+    if isinstance(index, abc.Mapping):
+        elements = toolz.get(elements, index)
+    elif isinstance(index, abc.Iterable):
+        index = index_elements(index)
+        elements = toolz.get(elements, index)
+    return np.ix_(elements, elements)
 
 
 def index_elements(elements: Iterable[Hashable]) -> Dict[Hashable, int]:
@@ -141,3 +155,7 @@ def extract_clustered_table(res, data):
         new_ind = data.index[res.dendrogram_row.reordered_ind]
 
         return data.loc[new_ind,:]
+
+
+def highlight_first_line(string):
+    return re.sub(r'^([^\n]+)', r'$\\bf{\g<1>}$', string)

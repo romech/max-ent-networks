@@ -13,11 +13,11 @@ Physics Reports, vol. 757, pp. 1–47, Oct. 2018, doi: 10.1016/j.physrep.2018.06
 import logging
 
 import numpy as np
-import toolz
 from tqdm import trange
 
 from sampling import LayerSplit
-from utils import empirical_strengths, index_elements, repeat_col, repeat_row
+from utils import (empirical_strengths, matrix_intersetions, repeat_col,
+                   repeat_row)
 
 
 def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
@@ -87,14 +87,13 @@ def reconstruct_layer_sample(
     # matrix as an initial solution, and insert the observed part.
     W0 = _W_me(s_in, s_out)
 
-    nodes = sample.full.nodes
-    node_index = index_elements(nodes)
-    observed_node_ids = toolz.get(sample.observed.nodes, node_index)
-    W0[np.ix_(observed_node_ids, observed_node_ids)] = 0
+    observed_entries = matrix_intersetions(sample.observed.nodes,
+                                           index=sample.node_index)
+    W0[observed_entries] = 0
 
     for edge in sample.observed.edges.itertuples():
-        u = node_index[edge.node_1]
-        v = node_index[edge.node_2]
+        u = sample.node_index[edge.node_1]
+        v = sample.node_index[edge.node_2]
         if marginalized:
             W0[(u, v)] = 1
         else:
