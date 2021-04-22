@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import toolz
 from joblib import Memory
 from sklearn.cluster import OPTICS, AgglomerativeClustering
 from tqdm import tqdm
@@ -130,17 +129,15 @@ def demo_clustering():
 
 
 def demo_clustering_coef(plot=True):
-    from networkx.algorithms.cluster import average_clustering
-
-    from nx_toolset import edges_to_nx_ensemble
+    from nx_toolset import clust_coef_by_layer
     
     label_clust = 'clustering coefficient'
     label_links = 'number of links'
     label_nodes = 'number of nodes'
     
-    edges, node_names, layer_names = load_dataset()
-    graphs = edges_to_nx_ensemble(layer_names.index, node_names.index, edges)
-    clust_coef = toolz.valmap(average_clustering, graphs)
+    dataset = load_dataset()
+    edges = dataset.edges
+    clust_coef = clust_coef_by_layer(edges, parallelize=True)
     clust_coef = pd.Series(clust_coef, name=label_clust)
     
     layer_grouped = edges.groupby('layer_id')
@@ -149,7 +146,11 @@ def demo_clustering_coef(plot=True):
         .rename(columns={'e': label_links})
     nodes_num = layer_grouped.apply(node_set_size).rename(label_nodes)
     
-    df = layer_names.to_frame().join(clust_coef).join(links_num).join(nodes_num)
+    df = dataset.layer_names.\
+        to_frame().\
+        join(clust_coef).\
+        join(links_num).\
+        join(nodes_num)
     display(df)
     
     if plot:
