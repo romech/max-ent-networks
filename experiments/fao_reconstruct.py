@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import logging
 import random
 
@@ -7,23 +8,20 @@ import numpy as np
 import pandas as pd
 import toolz
 from mpl_toolkits.axes_grid1 import ImageGrid
-from sklearn.model_selection import train_test_split
-
-from fao_data import load_dataset
-from reconstruction import dbcm, ipf, random_baseline
-from sampling import GraphData, LayerSplit
-from utils import (edges_to_matrix, filter_by_layer, highlight_first_line,
-                   index_elements, matrix_intersetions, node_set,
-                   probabilies_to_adjacency)
+from tqdm import tqdm
 
 from experiments.metrics import binary_classification_metrics
+from fao_data import load_dataset
+from reconstruction import dbcm, ipf, random_baseline
+from sampling import LayerSplit, layer_split_with_no_observables, random_layer_split
+from utils import (edges_to_matrix, filter_by_layer, highlight_first_line,
+                   index_elements, matrix_intersetions, probabilies_to_adjacency)
 
-logging.basicConfig(level=logging.DEBUG)
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
 
-def random_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> LayerSplit:
+def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> LayerSplit:
     """
     Select random layer, then split its nodes into 'observed' and 'hidden' parts.
     Edges that are adjacent to any hidden node are also considered as 'hidden'.
@@ -32,6 +30,8 @@ def random_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> L
         layer_id (int, optional): Chosen at random by default.
         hidden_ratio (float): Ratio of nodes hidden (0.25 by default).
                               Ratio of hidden edges is essentially larger.
+                              If ratio = 1.0 then the observed edge list is empty, and
+                              reconstruction algorithm does not account for them.
         random_state (int): Random seed for splitting nodes.
 
     Returns:
@@ -43,30 +43,25 @@ def random_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> L
         layer_id = random.choice(dataset.layer_names.index)
     
     edges = filter_by_layer(dataset.edges, layer_id)
-    nodes = list(node_set(edges))
-    nodes_observed, nodes_hidden = train_test_split(
-        nodes,
-        test_size=hidden_ratio,
-        random_state=random_state
-    )
-    is_hidden_edge = edges.node_1.isin(nodes_hidden) | edges.node_2.isin(nodes_hidden)
-    edges_hidden = edges[is_hidden_edge]
-    edges_observed = edges[~is_hidden_edge]
     
-    node_index = {node_id: i for i, node_id in enumerate(nodes)}
-    return LayerSplit(
-        layer_id=layer_id,
-        node_index=node_index,
-        observed=GraphData(edges=edges_observed, nodes=nodes_observed),
-        hidden=GraphData(edges=edges_hidden, nodes=nodes_hidden),
-        full=GraphData(edges=edges, nodes=nodes)
-    )
+    if hidden_ratio != 1:
+        return random_layer_split(
+            edges=edges,
+            layer_id=layer_id,
+            hidden_ratio=hidden_ratio,
+            random_state=random_state
+        )
+    else:
+        return layer_split_with_no_observables(
+            edges=edges,
+            layer_id=layer_id
+        )
 
 
 def evaluate_reconstruction(
         sample: LayerSplit,
         probability_matrix: np.ndarray,
-        silent: bool = False):
+        verbose: bool = False):
     n = len(sample.node_index)
     assert probability_matrix.shape == (n, n)
     
@@ -87,30 +82,40 @@ def evaluate_reconstruction(
     pred_edges = list(zip(pred_edges_src, pred_edges_dst))
     
     metrics = binary_classification_metrics(target_edges, pred_edges)
-    if not silent:
+    if verbose:
         print(pd.Series(metrics))
     return metrics
 
 
 if __name__ == '__main__':
-    sample = random_layer_sample()  # 202
+    logging.basicConfig(level=logging.INFO)
+    
+    # tiny: layer_id=288
+    # small: layer_id=202
+    sample = fao_layer_sample()
     sample.print_summary()
     n = sample.n
     
     node_index = index_elements(sample.full.nodes)
     target_w = edges_to_matrix(sample.full.edges, node_index, node_index)
     
-    print('RANDOM')
-    random_w = random_baseline.reconstruct_layer_sample(sample)
-    evaluate_reconstruction(sample, random_w)
+    predictions = OrderedDict()
+    eval_res = OrderedDict()
+    experiments = [
+        ('Random', random_baseline.reconstruct_layer_sample),
+        ('IPF', ipf.reconstruct_layer_sample),
+        ('DBCM', dbcm.reconstruct_layer_sample),
+    ]
     
-    print('IPF')
-    ipf_w = ipf.reconstruct_layer_sample(sample)
-    evaluate_reconstruction(sample, ipf_w)
+    with tqdm(experiments, desc='Reconstruction experiments') as experiments_pbar:
+        for name, reconstruction_func in experiments_pbar:
+            experiments_pbar.set_postfix_str(name)
+            p_ij = reconstruction_func(sample)
+            eval_res[name] = evaluate_reconstruction(sample, p_ij)
+            predictions[name] = p_ij
     
-    print('DBCM')
-    dbcm_w = dbcm.reconstruct_layer_sample(sample)
-    evaluate_reconstruction(sample, dbcm_w)
+    eval_res = pd.DataFrame.from_dict(eval_res, orient='index')
+    print(eval_res)
     
     # Visualisation
     demo_sample = np.empty(target_w.shape, dtype=np.int8)
@@ -123,9 +128,9 @@ if __name__ == '__main__':
     
     res = [
         ('Source\n(observed - yellow,\nhidden - pink)', demo_sample),
-        ('IPF', ipf_w),
-        ('DBCM', dbcm_w),
-        ('Random', random_w),
+        ('IPF', predictions['IPF']),
+        ('DBCM', predictions['DBCM']),
+        ('Random', predictions['Random']),
     ]
     fig = plt.figure(figsize=(8, 2.8))
     fig.suptitle(f'Reconstruction results – probability matrices (layer {sample.layer_id})')
