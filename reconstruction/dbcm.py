@@ -3,7 +3,7 @@ Reconstruction using the Directed Binary Configuration Model.
 See chapter 3.3.3 in [1].
 
 Target: single-layered network
-Constraints: node strengths
+Constraints: node degrees
 
 
 [1] T. Squartini, G. Caldarelli, G. Cimini, A. Gabrielli, and D. Garlaschelli,
@@ -24,23 +24,19 @@ from utils import empirical_strengths, repeat_row, repeat_col
 
 def reconstruct_layer_sample(
         sample: LayerSplit,
-        marginalized: bool = True,
         s_in: np.ndarray = None,
         s_out: np.ndarray = None) -> np.ndarray:
-    
-    if not marginalized:
-        raise NotImplementedError()
     
     if s_in is None:
         s_in, s_out = empirical_strengths(
             sample.full.edges,
             sample.full.nodes,
-            marginalized=marginalized
+            marginalized=True
         )
     n = sample.n
         
     # Step 1 - Solving eqn. (46) for z
-    with tqdm(total=3, desc='Solving eqn for z', unit='step') as pbar:
+    with tqdm(total=3, desc='Solving eqn for z', unit='step', leave=False) as pbar:
         pbar.set_postfix_str('preparing equation')
         
         # The equation in solved numerically, but symbolic calculations
@@ -48,7 +44,9 @@ def reconstruct_layer_sample(
         z = Symbol('z')
         lhs = s_in.sum()
         s_prod = repeat_col(s_out, n) * repeat_row(s_in, n)
+        
         p_ij = [z * s_prod[i, j] / (1 + z * s_prod[i, j])
+                if i != j else z * 0
                 for i in range(n)
                 for j in range(n)]
         
@@ -71,7 +69,7 @@ def reconstruct_layer_sample(
         raise ValueError('Could not solve eqn for z')
     
     # Step 2 - Compute p_ij values
-    p_ij = [p.subs(z, sol.root) for p in p_ij]
+    p_ij = [p.subs(z, sol.root).evalf() for p in p_ij]
     p_ij = np.array(p_ij, dtype=np.float32).reshape(n, n)
     return p_ij
 
