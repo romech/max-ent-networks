@@ -6,17 +6,16 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import toolz
 from mpl_toolkits.axes_grid1 import ImageGrid
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from experiments.metrics import binary_classification_metrics
+from experiments.metrics import evaluate_reconstruction
 from fao_data import load_dataset
 from reconstruction import dbcm, ipf, random_baseline
 from sampling import LayerSplit, layer_split_with_no_observables, random_layer_split
-from utils import (edges_to_matrix, filter_by_layer, highlight_first_line,
-                   index_elements, matrix_intersetions, probabilies_to_adjacency)
+from utils import (display, edges_to_matrix, filter_by_layer, highlight_first_line,
+                   index_elements, matrix_intersetions)
 
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
@@ -59,38 +58,9 @@ def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> Laye
         )
 
 
-def evaluate_reconstruction(
-        sample: LayerSplit,
-        probability_matrix: np.ndarray,
-        verbose: bool = False):
-    n = len(sample.node_index)
-    assert probability_matrix.shape == (n, n)
-    
-    # Target (hidden) edges. Converting to zero-based index.
-    target_edges_src = toolz.get(sample.hidden.edges.node_1.tolist(), sample.node_index)
-    target_edges_dst = toolz.get(sample.hidden.edges.node_2.tolist(), sample.node_index)
-    target_edges = list(zip(target_edges_src, target_edges_dst))
-    
-    # Assigning zero probabilities to edges between observed nodes
-    observed_entries = matrix_intersetions(sample.observed.nodes, index=sample.node_index)
-    probability_matrix = probability_matrix.copy()
-    probability_matrix[observed_entries] = 0
-    np.fill_diagonal(probability_matrix, 0)
-    
-    # Transforming probabilities into adjacency matrix and edge list
-    pred_matrix = probabilies_to_adjacency(probability_matrix)
-    pred_edges_src, pred_edges_dst = pred_matrix.nonzero()
-    pred_edges = list(zip(pred_edges_src, pred_edges_dst))
-    
-    metrics = binary_classification_metrics(target_edges, pred_edges)
-    if verbose:
-        print(pd.Series(metrics))
-    return metrics
-
-
 def demo_evaluate_all_layers():
-    layer_ids = load_dataset(drop_small_layers=True).layer_names.index
-    # layer_ids = np.arange(1, 30)
+    # layer_ids = load_dataset(drop_small_layers=True).layer_names.index
+    layer_ids = np.arange(1, 30)
     seeds = [10, 42]
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
@@ -115,8 +85,8 @@ def demo_evaluate_all_layers():
     metrics = ['f1', 'precision', 'recall']
     stats_by_layer = results_df[metrics].groupby(level=['layer_id', 'name']).agg(_describe)
     stats_by_method = results_df[metrics].groupby(level=['name']).agg(_describe)
-    print(stats_by_layer)
-    print(stats_by_method)
+    display(stats_by_layer)
+    display(stats_by_method)
     return results_df
         
     

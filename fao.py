@@ -10,14 +10,10 @@ from tqdm import tqdm
 from cluster_analysis import demo_elbow_method, try_clustering
 from fao_data import load_all_layers, load_dataset
 from intra_layer import pairwise_multiplexity
-from utils import node_set_size, put_col_in_front, replace_underscores, extract_clustered_table
+from utils import (display, node_set_size, put_col_in_front,
+                   replace_underscores, extract_clustered_table)
 
 memory = Memory('.cache', verbose=0)
-
-try:
-    from IPython.display import display
-except ImportError:
-    display = print
 
 
 def report():

@@ -11,6 +11,12 @@ import toolz
 from scipy.sparse import csr_matrix
 
 
+try:
+    from IPython.display import display
+except ImportError:
+    display = print
+    
+
 def replace_underscores(string):
     return string.replace('_', ' ')
 
