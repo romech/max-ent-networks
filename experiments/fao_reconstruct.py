@@ -1,6 +1,6 @@
-from collections import OrderedDict
 import logging
 import random
+from collections import OrderedDict
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -9,6 +9,7 @@ import pandas as pd
 import toolz
 from mpl_toolkits.axes_grid1 import ImageGrid
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 
 from experiments.metrics import binary_classification_metrics
 from fao_data import load_dataset
@@ -87,17 +88,55 @@ def evaluate_reconstruction(
     return metrics
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+def demo_evaluate_all_layers():
+    layer_ids = load_dataset(drop_small_layers=True).layer_names.index
+    # layer_ids = np.arange(1, 30)
+    seeds = [10, 42]
+    experiments = [
+        ('Random', random_baseline.reconstruct_layer_sample),
+        ('IPF', ipf.reconstruct_layer_sample),
+        ('DBCM', dbcm.reconstruct_layer_sample),
+    ]
     
+    index_keys = []
+    runs = []
+    for layer_id in layer_ids:
+        for seed in seeds:
+            sample = fao_layer_sample(layer_id, random_state=seed)
+            for name, reconstruct_func in experiments:
+                index_keys.append((layer_id, name, seed))
+                runs.append((sample, reconstruct_func))
+    
+    results_list = process_map(_run_single_eval, runs, chunksize=3, max_workers=6)
+    results_df = pd.DataFrame(
+        results_list,
+        index=pd.MultiIndex.from_tuples(index_keys, names=['layer_id', 'name', 'seed']),
+    )
+    metrics = ['f1', 'precision', 'recall']
+    stats_by_layer = results_df[metrics].groupby(level=['layer_id', 'name']).agg(_describe)
+    stats_by_method = results_df[metrics].groupby(level=['name']).agg(_describe)
+    print(stats_by_layer)
+    print(stats_by_method)
+    return results_df
+        
+    
+def _run_single_eval(params):
+    sample, reconstruct_func = params
+    p_ij = reconstruct_func(sample)
+    res = evaluate_reconstruction(sample, p_ij)
+    return res
+
+
+def _describe(data):
+    return '{:.2f}±{:.2f}'.format(data.mean(), data.std())
+
+
+def demo_random_single_layer():
     # tiny: layer_id=288
     # small: layer_id=202
     sample = fao_layer_sample()
     sample.print_summary()
     n = sample.n
-    
-    node_index = index_elements(sample.full.nodes)
-    target_w = edges_to_matrix(sample.full.edges, node_index, node_index)
     
     predictions = OrderedDict()
     eval_res = OrderedDict()
@@ -118,6 +157,8 @@ if __name__ == '__main__':
     print(eval_res)
     
     # Visualisation
+    node_index = index_elements(sample.full.nodes)
+    target_w = edges_to_matrix(sample.full.edges, node_index, node_index)
     demo_sample = np.empty(target_w.shape, dtype=np.int8)
     target_w.todense(out=demo_sample)
     
@@ -153,3 +194,8 @@ if __name__ == '__main__':
     plt.savefig('output/fao_reconst_comparison.png', dpi=300)
     plt.savefig('output/fao_reconst_comparison.svg')
     
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    
+    res = demo_evaluate_all_layers()    

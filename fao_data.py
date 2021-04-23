@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache as cached
 from pathlib import Path
 from typing import Iterable, NamedTuple, Union
 
@@ -27,6 +28,7 @@ def load_all_layers() -> pd.DataFrame:
     return df
 
 
+@cached
 def load_dataset(drop_small_layers=False) -> FaoDataset:
     """
     Load FAO dataset including edges, layer_names and layer names.
