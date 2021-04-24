@@ -19,7 +19,7 @@ from toolz import excepts
 from tqdm import tqdm
 
 from sampling import LayerSplit
-from utils import empirical_strengths, repeat_row, repeat_col
+from utils import empirical_strengths, pairwise_product_matrix
 
 
 def reconstruct_layer_sample(
@@ -43,23 +43,21 @@ def reconstruct_layer_sample(
         # are used for finding derivatives.
         z = Symbol('z')
         lhs = s_in.sum()
-        s_prod = repeat_col(s_out, n) * repeat_row(s_in, n)
-        
-        p_ij = [z * s_prod[i, j] / (1 + z * s_prod[i, j])
+        s_prod = pairwise_product_matrix(s_out, s_in) * z
+        p_ij = [s_prod[i, j] / (1 + s_prod[i, j])
                 if i != j else z * 0
                 for i in range(n)
                 for j in range(n)]
         
         pbar.update()
         pbar.set_postfix_str('taking primes')
-        f, fprime, fprime2 = _as_function_with_primes(z, lhs, p_ij)
+        f, fprime = _as_function_with_primes(z, lhs, p_ij, order=1)
         
         pbar.update()
         # Solving numerically requires x0, so we try different values, just in case.
         for x0 in np.logspace(-5, 1, 10):
             pbar.set_postfix_str(f'trying x0={x0:.1e}')
-            sol = root_scalar(f=f, fprime=fprime, fprime2=fprime2, x0=x0,
-                              method='halley', xtol=1e-10)
+            sol = root_scalar(f=f, fprime=fprime, x0=x0, xtol=1e-10)
             if sol.converged and sol.root > 0:
                 break
         pbar.update()
@@ -74,7 +72,7 @@ def reconstruct_layer_sample(
     return p_ij
 
 
-def _as_function_with_primes(z, lhs, p_ij):
+def _as_function_with_primes(z, lhs, p_ij, order=1):
     """
     lhs = const
     rhs = sum(p_ij(z))
@@ -84,26 +82,40 @@ def _as_function_with_primes(z, lhs, p_ij):
         F'(z)  = -rhs'(z)
         F''(z) = -rhs''(z)
     """
-    p_ij_pr = [p.diff(z) for p in p_ij]
-    p_ij_pr2 = [p_pr.diff(z) for p_pr in p_ij_pr]
-    
     rhs = Add(*p_ij)
-    rhs_prime = Add(*p_ij_pr)
-    rhs_prime2 = Add(*p_ij_pr2)
     
+    @recover_from_nan
     def f(x):
         return float(lhs - rhs.subs(z, x))
     
+    if order == 0:
+        return f
+    
+    # 1st order
+    p_ij_pr = [p.diff(z) for p in p_ij]
+    rhs_prime = Add(*p_ij_pr)
+    
+    @recover_from_nan
     def fprime(x):
         return float(-rhs_prime.subs(z, x))
     
+    if order == 1:
+        return f, fprime
+    
+    # 2nd order
+    p_ij_pr2 = [p_pr.diff(z) for p_pr in p_ij_pr]
+    rhs_prime2 = Add(*p_ij_pr2)
+    
+    @recover_from_nan
     def fprime2(x):
         return float(-rhs_prime2.subs(z, x))
     
-    def nan_fallback(_):
-        return np.nan
-    
-    f = excepts(TypeError, f, nan_fallback)
-    fprime = excepts(TypeError, fprime, nan_fallback)
-    fprime2 = excepts(TypeError, fprime2, nan_fallback)
     return f, fprime, fprime2
+
+
+def _nan_fallback(_):
+    return np.nan
+    
+
+def recover_from_nan(f):
+    return excepts(TypeError, f, _nan_fallback)

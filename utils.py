@@ -57,6 +57,10 @@ def repeat_row(array: np.ndarray, n: int):
     return array.reshape(1, -1).repeat(n, axis=0)
 
 
+def pairwise_product_matrix(vect_1, vect_2):
+    return vect_1.reshape(-1, 1) @ vect_2.reshape(1, -1)
+
+
 def probabilies_to_adjacency(matrix):
     return np.random.rand(*matrix.shape) < matrix
 
