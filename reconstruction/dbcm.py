@@ -19,13 +19,14 @@ from toolz import excepts
 from tqdm import tqdm
 
 from sampling import LayerSplit
-from utils import empirical_strengths, pairwise_product_matrix
+from utils import empirical_strengths, sparse_pairwise_product_matrix
 
 
 def reconstruct_layer_sample(
         sample: LayerSplit,
         s_in: np.ndarray = None,
-        s_out: np.ndarray = None) -> np.ndarray:
+        s_out: np.ndarray = None,
+        sol_order: int = 1) -> np.ndarray:
     
     if s_in is None:
         s_in, s_out = empirical_strengths(
@@ -36,28 +37,36 @@ def reconstruct_layer_sample(
     n = sample.n
         
     # Step 1 - Solving eqn. (46) for z
-    with tqdm(total=3, desc='Solving eqn for z', unit='step', leave=False) as pbar:
+    with tqdm(total=3, desc='Solving eqn for z', unit='step', smoothing=1, leave=False) as pbar:
         pbar.set_postfix_str('preparing equation')
         
         # The equation in solved numerically, but symbolic calculations
         # are used for finding derivatives.
         z = Symbol('z')
         lhs = s_in.sum()
-        s_prod = pairwise_product_matrix(s_out, s_in) * z
-        p_ij = [s_prod[i, j] / (1 + s_prod[i, j])
+        
+        # Let S(i,j) = s_out(i) * s_in(j)
+        S = sparse_pairwise_product_matrix(s_out, s_in)
+        p_ij = [S[i, j] / (1 / z + S[i, j])
                 if i != j else z * 0
                 for i in range(n)
                 for j in range(n)]
         
         pbar.update()
         pbar.set_postfix_str('taking primes')
-        f, fprime = _as_function_with_primes(z, lhs, p_ij, order=1)
+        f, *primes = _as_function_with_primes(z, lhs, p_ij, order=sol_order)
         
         pbar.update()
         # Solving numerically requires x0, so we try different values, just in case.
         for x0 in np.logspace(-5, 1, 10):
             pbar.set_postfix_str(f'trying x0={x0:.1e}')
-            sol = root_scalar(f=f, fprime=fprime, x0=x0, xtol=1e-10)
+            sol = root_scalar(
+                f=f,
+                fprime=primes[0] if sol_order > 0 else None,
+                fprime2=primes[1] if sol_order > 1 else None,
+                x0=x0,
+                x1=1 if sol_order == 0 else None,
+                xtol=1e-10)
             if sol.converged and sol.root > 0:
                 break
         pbar.update()
@@ -67,7 +76,7 @@ def reconstruct_layer_sample(
         raise ValueError('Could not solve eqn for z')
     
     # Step 2 - Compute p_ij values
-    p_ij = [p.subs(z, sol.root).evalf() for p in p_ij]
+    p_ij = [p.evalf(subs={z: sol.root}) for p in p_ij]
     p_ij = np.array(p_ij, dtype=np.float32).reshape(n, n)
     return p_ij
 
@@ -82,18 +91,18 @@ def _as_function_with_primes(z, lhs, p_ij, order=1):
         F'(z)  = -rhs'(z)
         F''(z) = -rhs''(z)
     """
-    rhs = Add(*p_ij)
+    rhs = Add(*p_ij, evaluate=False)
     
     @recover_from_nan
     def f(x):
         return float(lhs - rhs.subs(z, x))
     
     if order == 0:
-        return f
+        return (f,)
     
     # 1st order
     p_ij_pr = [p.diff(z) for p in p_ij]
-    rhs_prime = Add(*p_ij_pr)
+    rhs_prime = Add(*p_ij_pr, evaluate=False)
     
     @recover_from_nan
     def fprime(x):
@@ -104,7 +113,7 @@ def _as_function_with_primes(z, lhs, p_ij, order=1):
     
     # 2nd order
     p_ij_pr2 = [p_pr.diff(z) for p_pr in p_ij_pr]
-    rhs_prime2 = Add(*p_ij_pr2)
+    rhs_prime2 = Add(*p_ij_pr2, evaluate=False)
     
     @recover_from_nan
     def fprime2(x):

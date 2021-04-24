@@ -101,10 +101,10 @@ def _describe(data):
     return '{:.2f}±{:.2f}'.format(data.mean(), data.std())
 
 
-def demo_random_single_layer():
+def demo_random_single_layer(layer_id=None):
     # tiny: layer_id=288
     # small: layer_id=202
-    sample = fao_layer_sample()
+    sample = fao_layer_sample(layer_id=layer_id)
     sample.print_summary()
     n = sample.n
     
@@ -166,6 +166,7 @@ def demo_random_single_layer():
     
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     
-    res = demo_evaluate_all_layers()    
+    # res = demo_evaluate_all_layers()    
+    demo_random_single_layer(31)

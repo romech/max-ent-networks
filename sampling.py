@@ -6,7 +6,7 @@ from typing import Dict, List, NamedTuple, Optional, Union
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from utils import node_set
+from utils import display, node_set
 
 
 NodeLabel = Union[int, str]
@@ -38,8 +38,8 @@ class LayerSplit(NamedTuple):
             }, orient='index')
         summary['obs.ratio'] = summary.observed / summary.total
         
-        print('Summary of random split. Layer id:', self.layer_id)
-        print(summary)
+        display(f'Summary of random split. Layer id: {self.layer_id}')
+        display(summary)
     
     @property
     def n(self):

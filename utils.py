@@ -61,6 +61,12 @@ def pairwise_product_matrix(vect_1, vect_2):
     return vect_1.reshape(-1, 1) @ vect_2.reshape(1, -1)
 
 
+def sparse_pairwise_product_matrix(vect_1, vect_2):
+    sv1 = csr_matrix(vect_1.reshape(-1, 1))
+    sv2 = csr_matrix(vect_2.reshape(1, -1))
+    return sv1 @ sv2
+    
+
 def probabilies_to_adjacency(matrix):
     return np.random.rand(*matrix.shape) < matrix
 
