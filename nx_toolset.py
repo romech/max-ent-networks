@@ -30,7 +30,8 @@ def edges_to_nx(edges: pd.DataFrame, nodes: Optional[Iterable] = None) -> nx.DiG
     return G
 
 
-def clust_coef_by_layer(edges: pd.DataFrame, parallelize: bool = False):
+def clust_coef_by_layer(edges: pd.DataFrame,
+                        num_workers: int = -1):
     """
     Compute average clustering coefficients for every layer
 
@@ -50,15 +51,17 @@ def clust_coef_by_layer(edges: pd.DataFrame, parallelize: bool = False):
     """
     layer_ids, layer_edges = zip(*edges.groupby('layer_id'))
     
-    get_cc_from_edges = toolz.compose(average_clustering, edges_to_nx)
+    get_cc_from_edges = toolz.compose(average_clustering,
+                                      nx.DiGraph.to_undirected,
+                                      edges_to_nx)
 
-    if parallelize:
+    if num_workers > 0:
         from tqdm.contrib.concurrent import process_map
         
         layer_cc = process_map(
             get_cc_from_edges,
             layer_edges,
-            max_workers=6,
+            max_workers=num_workers,
             chunksize=8,
             desc='Clustering coefficients',
             leave=False)

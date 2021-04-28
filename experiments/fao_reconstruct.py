@@ -1,3 +1,4 @@
+import argparse
 import logging
 import random
 from collections import OrderedDict
@@ -15,7 +16,7 @@ from fao_data import load_dataset
 from reconstruction import dbcm, ipf, random_baseline
 from sampling import LayerSplit, layer_split_with_no_observables, random_layer_split
 from utils import (display, edges_to_matrix, filter_by_layer, highlight_first_line,
-                   index_elements, matrix_intersetions)
+                   index_elements, matrix_intersetions, describe_mean_std)
 
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
@@ -58,13 +59,17 @@ def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> Laye
         )
 
 
-def demo_evaluate_all_layers():
-    # layer_ids = load_dataset(drop_small_layers=True).layer_names.index
-    layer_ids = np.arange(1, 30)
-    seeds = [10, 42]
+def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_workers=6):
+    if layer_ids is None:
+        layer_ids = load_dataset(drop_small_layers=True).layer_names.index
+        if n is not None:
+            layer_ids = random.choices(layer_ids, k=n)
+    
+    seeds = np.arange(num_seeds)
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
         ('IPF', ipf.reconstruct_layer_sample),
+        ('IPF unconscious', ipf.reconstruct_layer_sample_unconsciously),
         ('DBCM', dbcm.reconstruct_layer_sample),
     ]
     
@@ -77,16 +82,18 @@ def demo_evaluate_all_layers():
                 index_keys.append((layer_id, name, seed))
                 runs.append((sample, reconstruct_func))
     
-    results_list = process_map(_run_single_eval, runs, chunksize=3, max_workers=6)
+    results_list = process_map(_run_single_eval, runs,
+                               chunksize=3, max_workers=num_workers)
     results_df = pd.DataFrame(
         results_list,
         index=pd.MultiIndex.from_tuples(index_keys, names=['layer_id', 'name', 'seed']),
     )
     metrics = ['f1', 'precision', 'recall']
-    stats_by_layer = results_df[metrics].groupby(level=['layer_id', 'name']).agg(_describe)
-    stats_by_method = results_df[metrics].groupby(level=['name']).agg(_describe)
-    display(stats_by_layer)
-    display(stats_by_method)
+    print('Stats by layer')
+    display(results_df[metrics].groupby(level=['layer_id', 'name']).agg(describe_mean_std))
+    
+    print('Stats by method')
+    display(results_df[metrics].groupby(level=['name']).agg(describe_mean_std))
     return results_df
         
     
@@ -95,10 +102,6 @@ def _run_single_eval(params):
     p_ij = reconstruct_func(sample)
     res = evaluate_reconstruction(sample, p_ij)
     return res
-
-
-def _describe(data):
-    return '{:.2f}±{:.2f}'.format(data.mean(), data.std())
 
 
 def demo_random_single_layer(layer_id=None):
@@ -113,6 +116,7 @@ def demo_random_single_layer(layer_id=None):
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
         ('IPF', ipf.reconstruct_layer_sample),
+        ('IPF unconscious', ipf.reconstruct_layer_sample_unconsciously),
         ('DBCM', dbcm.reconstruct_layer_sample),
     ]
     
@@ -168,5 +172,25 @@ def demo_random_single_layer(layer_id=None):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     
-    # res = demo_evaluate_all_layers()    
-    demo_random_single_layer(31)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--layer_id', type=int, default=None,
+                        help='Run single experiment with specified layer_id')
+    parser.add_argument('-a', '--all', action='store_true',
+                        help='Run experiments for all layers')
+    parser.add_argument('-n', type=int, default=30,
+                        help='Run experiments for n layers')
+    parser.add_argument('-s', '--num_seeds', type=int, default=2,
+                        help='Number of random seeds')
+    parser.add_argument('-w', '--num_workers', type=int, default=6)
+      
+    args = parser.parse_args()
+    
+    if args.layer_id is not None:
+        demo_random_single_layer(args.layer_id)
+    elif args.all:
+        res = demo_evaluate_multiple_layers(num_seeds=args.num_seeds,
+                                            num_workers=args.num_workers)
+    else:
+        res = demo_evaluate_multiple_layers(args.n,
+                                            num_seeds=args.num_seeds,
+                                            num_workers=args.num_workers)

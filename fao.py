@@ -124,7 +124,7 @@ def demo_clustering():
     return multiplexity_matrix, layer_ids, trials
 
 
-def demo_clustering_coef(plot=True):
+def demo_clustering_coef(plot=True, num_workers=4):
     from nx_toolset import clust_coef_by_layer
     
     label_clust = 'clustering coefficient'
@@ -133,7 +133,7 @@ def demo_clustering_coef(plot=True):
     
     dataset = load_dataset()
     edges = dataset.edges
-    clust_coef = clust_coef_by_layer(edges, parallelize=True)
+    clust_coef = clust_coef_by_layer(edges, num_workers=num_workers)
     clust_coef = pd.Series(clust_coef, name=label_clust)
     
     layer_grouped = edges.groupby('layer_id')

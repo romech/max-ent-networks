@@ -49,6 +49,13 @@ def node_set_size(edges: pd.DataFrame) -> int:
     return len(node_set(edges))
 
 
+def layer_density(layer_edges):
+    m = len(layer_edges)
+    n = node_set_size(layer_edges)
+    max_m = n * (n - 1)
+    return m / max_m
+
+
 def repeat_col(array: np.ndarray, n: int):
     return array.reshape(-1, 1).repeat(n, axis=1)
 
@@ -92,6 +99,13 @@ def filter_by_layer(edges: pd.DataFrame, layer_ids: Union[int, str, List, Tuple]
     else:
         raise ValueError(f'Expected int/str/list for layer_ids parameter, got {type(layer_ids)}')
     return edges[crit]
+
+
+def describe_mean_std(data):
+    if len(data) == 1:
+        return '{:.2f}'.format(data)
+    else:
+        return '{:.2f}±{:.2f}'.format(data.mean(), data.std())
 
 
 def edges_to_matrix(edges: pd.DataFrame,

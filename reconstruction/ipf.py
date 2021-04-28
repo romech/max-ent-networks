@@ -13,9 +13,10 @@ Physics Reports, vol. 757, pp. 1–47, Oct. 2018, doi: 10.1016/j.physrep.2018.06
 import logging
 
 import numpy as np
+import pandas as pd
 from tqdm import trange
 
-from sampling import LayerSplit
+from sampling import LayerSplit, GraphData
 from utils import (empirical_strengths, matrix_intersetions, repeat_col,
                    repeat_row)
 
@@ -34,7 +35,7 @@ def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
     W_n = W.copy()
     np.fill_diagonal(W_n, 0)
     
-    steps_pbar = trange(max_steps, desc='IPF steps', leave=False)
+    steps_pbar = trange(max_steps, desc='IPF steps', delay=3, leave=False)
     for step in steps_pbar:
         W_prev = W_n.copy()
         
@@ -101,7 +102,22 @@ def reconstruct_layer_sample(
     
     Wn = reconstruct(W0, s_in, s_out)
     return Wn
-    
+
+
+def reconstruct_layer_sample_unconsciously(
+        sample: LayerSplit,
+        marginalized: bool = True,
+        s_in: np.ndarray = None,
+        s_out: np.ndarray = None) -> np.ndarray:
+    empty_graph = GraphData(
+        edges=pd.DataFrame(columns=sample.full.edges.columns, index=[]),
+        nodes=[])
+    sample = sample._replace(hidden=sample.full, observed=empty_graph)
+    return reconstruct_layer_sample(sample,
+                                    marginalized=marginalized,
+                                    s_in=s_in,
+                                    s_out=s_out)
+
 
 def _W_me(s_in, s_out):
     total_w = s_in.sum()

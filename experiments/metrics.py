@@ -3,9 +3,11 @@ from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
 import toolz
+from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error
 
 from sampling import LayerSplit
-from utils import display, matrix_intersetions, probabilies_to_adjacency
+from utils import (display, empirical_strengths, matrix_intersetions,
+                   probabilies_to_adjacency)
 
 Edge = Tuple[int, int]
 
@@ -39,6 +41,21 @@ def binary_classification_metrics(target: Iterable[Edge], pred: Iterable[Edge]):
                 num_expected=num_expected, num_predicted=num_predicted)
 
 
+def check_constraints(sample, probability_matrix):
+    s_in, s_out = empirical_strengths(sample.full.edges,
+                                      sample.full.nodes,
+                                      marginalized=True)
+    _s_in = probability_matrix.sum(axis=1)
+    _s_out = probability_matrix.sum(axis=0)
+    return dict(
+        s_in_mae=mean_absolute_error(s_in, _s_in),
+        s_out_mae=mean_absolute_error(s_out, _s_out),
+        # s_in_mape=mean_absolute_percentage_error(s_in, _s_in),
+        # s_out_mape=mean_absolute_percentage_error(s_out, _s_out)
+    )
+    
+
+
 def evaluate_reconstruction(
         sample: LayerSplit,
         probability_matrix: np.ndarray,
@@ -63,6 +80,9 @@ def evaluate_reconstruction(
     pred_edges = list(zip(pred_edges_src, pred_edges_dst))
     
     metrics = binary_classification_metrics(target_edges, pred_edges)
+    constr_metrics = check_constraints(sample, probability_matrix)
     if verbose:
         display(pd.Series(metrics))
+        display(pd.Series(constr_metrics))
+    metrics.update(constr_metrics)
     return metrics
