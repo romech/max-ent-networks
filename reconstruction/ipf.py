@@ -14,11 +14,11 @@ import logging
 
 import numpy as np
 import pandas as pd
-from tqdm import trange
+from tqdm.auto import trange
 
 from sampling import LayerSplit, GraphData
 from utils import (empirical_strengths, matrix_intersetions, repeat_col,
-                   repeat_row)
+                   repeat_row, verify_finite)
 
 
 def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
@@ -43,11 +43,15 @@ def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
         _s_in = W_n.sum(axis=0)
         # Replacing some values with eps to avoid zero by zero division
         _s_in = np.where(s_in > 0, _s_in, 1e-10)
+        if not verify_finite(_s_in):
+            return W_prev
         W_n = repeat_row(s_in, N) * (W_n / repeat_row(_s_in, N))
         
         # STEP 2 - s_out.
         _s_out = W_n.sum(axis=1)
         _s_out = np.where(s_out > 0, _s_out, 1e-10)
+        if not verify_finite(_s_out):
+            return W_prev
         W_n = repeat_col(s_out, N) * (W_n / repeat_col(_s_out, N))
         
         if np.allclose(W_n, W_prev, atol=tol):

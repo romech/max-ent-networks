@@ -16,7 +16,7 @@ import numpy as np
 from scipy.optimize import root_scalar
 from sympy import Add, Symbol
 from toolz import excepts
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from sampling import LayerSplit
 from utils import empirical_strengths, sparse_pairwise_product_matrix
@@ -73,7 +73,8 @@ def reconstruct_layer_sample(
         
     logging.debug(sol)
     if not sol.converged:
-        raise ValueError('Could not solve eqn for z')
+        logging.warning(f'Could not solve eqn for z, layer_id={sample.layer_id}')
+        return np.zeros((n, n))
     
     # Step 2 - Compute p_ij values
     p_ij = [p.evalf(subs={z: sol.root}) for p in p_ij]

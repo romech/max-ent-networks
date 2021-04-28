@@ -1,3 +1,4 @@
+import logging
 import re
 import traceback
 from collections import abc
@@ -100,6 +101,15 @@ def filter_by_layer(edges: pd.DataFrame, layer_ids: Union[int, str, List, Tuple]
         raise ValueError(f'Expected int/str/list for layer_ids parameter, got {type(layer_ids)}')
     return edges[crit]
 
+
+def verify_finite(arr):
+    if np.isfinite(arr):
+        return True
+    if np.isnan(arr).any():
+        logging.warning('NaN value encoutered', stack_info=True)
+    if np.isinf(arr).any():
+        logging.warning('Infinite value encoutered', stack_info=True)
+    return False
 
 def describe_mean_std(data):
     if len(data) == 1:
