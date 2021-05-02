@@ -45,15 +45,18 @@ def check_constraints(sample, probability_matrix):
     s_in, s_out = empirical_strengths(sample.full.edges,
                                       sample.full.nodes,
                                       marginalized=True)
+    """
+    Compute deviation of s_in/s_out from expected values.
+    Return dict with MAE and weighted MAPE.
+    """
     _s_in = probability_matrix.sum(axis=1)
     _s_out = probability_matrix.sum(axis=0)
     return dict(
         s_in_mae=mean_absolute_error(s_in, _s_in),
         s_out_mae=mean_absolute_error(s_out, _s_out),
-        # s_in_mape=mean_absolute_percentage_error(s_in, _s_in),
-        # s_out_mape=mean_absolute_percentage_error(s_out, _s_out)
+        s_in_mape=mean_absolute_percentage_error(s_in, _s_in, sample_weight=s_in),
+        s_out_mape=mean_absolute_percentage_error(s_out, _s_out, sample_weight=s_out)
     )
-    
 
 
 def evaluate_reconstruction(

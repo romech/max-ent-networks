@@ -103,7 +103,7 @@ def filter_by_layer(edges: pd.DataFrame, layer_ids: Union[int, str, List, Tuple]
 
 
 def verify_finite(arr):
-    if np.isfinite(arr):
+    if np.isfinite(arr).all():
         return True
     if np.isnan(arr).any():
         logging.warning('NaN value encoutered', stack_info=True)

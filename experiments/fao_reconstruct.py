@@ -144,6 +144,7 @@ def demo_random_single_layer(layer_id=None):
     res = [
         ('Source\n(observed - yellow,\nhidden - pink)', demo_sample),
         ('IPF', predictions['IPF']),
+        ('IPF\n(links not enforced)', predictions['IPF unconscious']),
         ('DBCM', predictions['DBCM']),
         ('Random', predictions['Random']),
     ]
@@ -165,7 +166,7 @@ def demo_random_single_layer(layer_id=None):
         ax.set_axis_off()
         if i == 0:
             grid.cbar_axes[0].colorbar(im)
-    plt.savefig('output/fao_reconst_comparison.png', dpi=300)
+    plt.savefig('output/fao_reconst_comparison.png', dpi=1200)
     plt.savefig('output/fao_reconst_comparison.svg')
     
 
