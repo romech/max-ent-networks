@@ -3,19 +3,18 @@ import logging
 import random
 from collections import OrderedDict
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from mpl_toolkits.axes_grid1 import ImageGrid
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 from experiments.metrics import evaluate_reconstruction
+from experiments.visualise_adjmatrix import adjmatrix_figure
 from fao_data import load_dataset
 from reconstruction import dbcm, ipf, random_baseline
 from sampling import LayerSplit, layer_split_with_no_observables, random_layer_split
-from utils import (display, edges_to_matrix, filter_by_layer, highlight_first_line,
+from utils import (display, edges_to_matrix, filter_by_layer,
                    index_elements, matrix_intersetions, describe_mean_std)
 
 mpl_logger = logging.getLogger('matplotlib')
@@ -88,15 +87,15 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
         results_list,
         index=pd.MultiIndex.from_tuples(index_keys, names=['layer_id', 'name', 'seed']),
     )
-    metrics = ['f1', 'precision', 'recall']
+    metrics = ['f1', 'precision', 'recall', 's_in_mape', 's_out_mape']
     print('Stats by layer')
     display(results_df[metrics].groupby(level=['layer_id', 'name']).agg(describe_mean_std))
     
     print('Stats by method')
     display(results_df[metrics].groupby(level=['name']).agg(describe_mean_std))
     return results_df
-        
-    
+
+
 def _run_single_eval(params):
     sample, reconstruct_func = params
     p_ij = reconstruct_func(sample)
@@ -109,7 +108,6 @@ def demo_random_single_layer(layer_id=None):
     # small: layer_id=202
     sample = fao_layer_sample(layer_id=layer_id)
     sample.print_summary()
-    n = sample.n
     
     predictions = OrderedDict()
     eval_res = OrderedDict()
@@ -148,24 +146,10 @@ def demo_random_single_layer(layer_id=None):
         ('DBCM', predictions['DBCM']),
         ('Random', predictions['Random']),
     ]
-    fig = plt.figure(figsize=(8, 2.8))
-    fig.suptitle(f'Reconstruction results – probability matrices (layer {sample.layer_id})')
-    plt.axis('off')
-    grid = ImageGrid(fig, 111,  # similar to subplot(111)
-                    nrows_ncols=(1, len(res)),
-                    cbar_mode='single',
-                    label_mode=1)
-    for i, ((name, mat), ax) in enumerate(zip(res, grid)):
-        im = ax.imshow(mat,
-                       cmap='inferno',
-                       norm=mpl.colors.Normalize(0, 1, clip=True))
-        ax.set_title(highlight_first_line(name),
-                     fontsize=9,
-                     verticalalignment='top',
-                     y=-0.15)
-        ax.set_axis_off()
-        if i == 0:
-            grid.cbar_axes[0].colorbar(im)
+    adjmatrix_figure(
+        res,
+        title=f'Reconstruction results – probability matrices (layer {sample.layer_id})'
+    )
     plt.savefig('output/fao_reconst_comparison.png', dpi=1200)
     plt.savefig('output/fao_reconst_comparison.svg')
     
@@ -180,6 +164,8 @@ if __name__ == '__main__':
                         help='Run experiments for all layers')
     parser.add_argument('-n', type=int, default=30,
                         help='Run experiments for n layers')
+    parser.add_argument('-ll', '--layer_ids', type=int, nargs='*',
+                        help='Run for selected layer ids')
     parser.add_argument('-s', '--num_seeds', type=int, default=2,
                         help='Number of random seeds')
     parser.add_argument('-w', '--num_workers', type=int, default=6)
@@ -191,7 +177,11 @@ if __name__ == '__main__':
     elif args.all:
         res = demo_evaluate_multiple_layers(num_seeds=args.num_seeds,
                                             num_workers=args.num_workers)
+    elif args.layer_ids:
+        res = demo_evaluate_multiple_layers(layer_ids=args.layer_ids,
+                                            num_seeds=args.num_seeds,
+                                            num_workers=args.num_workers)
     else:
-        res = demo_evaluate_multiple_layers(args.n,
+        res = demo_evaluate_multiple_layers(n=args.n,
                                             num_seeds=args.num_seeds,
                                             num_workers=args.num_workers)

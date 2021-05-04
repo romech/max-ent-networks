@@ -58,7 +58,9 @@ def reconstruct_layer_sample(
         
         pbar.update()
         # Solving numerically requires x0, so we try different values, just in case.
-        for x0 in np.logspace(-5, 1, 10):
+        x0_estimates = np.logspace(-np.log10(s_in.max() * s_out.max()), 2, 10)
+        np.random.shuffle(x0_estimates)
+        for x0 in x0_estimates:
             pbar.set_postfix_str(f'trying x0={x0:.1e}')
             sol = root_scalar(
                 f=f,

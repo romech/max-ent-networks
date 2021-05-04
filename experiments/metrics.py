@@ -84,8 +84,7 @@ def evaluate_reconstruction(
     
     metrics = binary_classification_metrics(target_edges, pred_edges)
     constr_metrics = check_constraints(sample, probability_matrix)
+    metrics.update(constr_metrics)
     if verbose:
         display(pd.Series(metrics))
-        display(pd.Series(constr_metrics))
-    metrics.update(constr_metrics)
     return metrics
