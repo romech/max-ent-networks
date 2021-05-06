@@ -67,7 +67,7 @@ def reconstruct_layer_sample(
         
         pbar.update()
         pbar.set_postfix_str('taking primes')
-        f, *primes = _as_function_with_primes(z, lhs, p_ij, order=sol_order)
+        f_with_primes = _as_function_with_primes(z, lhs, p_ij, order=sol_order)
         
         pbar.update()
         # Solving numerically requires x0, so we try different values, just in case.
@@ -76,9 +76,9 @@ def reconstruct_layer_sample(
         for trial, x0 in enumerate(x0_estimates, 1):
             pbar.set_postfix_str(f'trying x0={x0:.1e}')
             sol = root_scalar(
-                f=f,
-                fprime=primes[0] if sol_order > 0 else None,
-                fprime2=primes[1] if sol_order > 1 else None,
+                f=f_with_primes,
+                fprime=sol_order > 0,
+                fprime2=sol_order > 1,
                 x0=x0,
                 x1=1 if sol_order == 0 else None,
                 xtol=1e-10,
@@ -129,31 +129,34 @@ def _as_function_with_primes(z, lhs, p_ij, order=1):
     
     @recover_from_nan
     def f(x):
-        return float(lhs - rhs.subs(z, x))
-    
+        return float((lhs - rhs).evalf(subs={z: x}))
+
     if order == 0:
-        return (f,)
+        return f
     
     # 1st order
     p_ij_pr = [p.diff(z) for p in p_ij]
     rhs_prime = Add(*p_ij_pr, evaluate=False)
     
     @recover_from_nan
-    def fprime(x):
-        return float(-rhs_prime.subs(z, x))
+    def f_df(x):
+        df = float(-rhs_prime.evalf(subs={z: x}))
+        return f(x), df
     
     if order == 1:
-        return f, fprime
+        return f_df
     
     # 2nd order
     p_ij_pr2 = [p_pr.diff(z) for p_pr in p_ij_pr]
     rhs_prime2 = Add(*p_ij_pr2, evaluate=False)
     
     @recover_from_nan
-    def fprime2(x):
-        return float(-rhs_prime2.subs(z, x))
+    def f_df_d2f(x):
+        f, df = f_df(x)
+        d2f = float(-rhs_prime2.evalf(subs={z: x}))
+        return f, df, d2f
     
-    return f, fprime, fprime2
+    return f_df_d2f
 
 
 def _nan_fallback(_):

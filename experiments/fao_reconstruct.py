@@ -118,8 +118,8 @@ def demo_random_single_layer(layer_id=None):
         ('Random', random_baseline.reconstruct_layer_sample),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         ('IPF enforced', ipf.reconstruct_layer_sample),
-        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False, sol_order=1)),
-        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True, sol_order=1)),
+        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
+        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
     ]
     
     with tqdm(experiments, desc='Reconstruction experiments') as experiments_pbar:
