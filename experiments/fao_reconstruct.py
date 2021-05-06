@@ -116,9 +116,10 @@ def demo_random_single_layer(layer_id=None):
     eval_res = OrderedDict()
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
-        ('IPF', ipf.reconstruct_layer_sample),
-        ('IPF unconscious', ipf.reconstruct_layer_sample_unconsciously),
-        ('DBCM', dbcm.reconstruct_layer_sample),
+        ('IPF', ipf.reconstruct_layer_sample_unconsciously),
+        ('IPF enforced', ipf.reconstruct_layer_sample),
+        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False, sol_order=1)),
+        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True, sol_order=1)),
     ]
     
     with tqdm(experiments, desc='Reconstruction experiments') as experiments_pbar:
@@ -145,13 +146,14 @@ def demo_random_single_layer(layer_id=None):
     res = [
         ('Source\n(observed - yellow,\nhidden - pink)', demo_sample),
         ('IPF', predictions['IPF']),
-        ('IPF\n(links not enforced)', predictions['IPF unconscious']),
-        ('DBCM', predictions['DBCM']),
+        ('IPF\n(links enforced)', predictions['IPF enforced']),
         ('Random', predictions['Random']),
+        ('DBCM', predictions['DBCM']),
+        ('DBCM\n(links enforced)', predictions['DBCM enforced']),
     ]
     adjmatrix_figure(
         res,
-        title=f'Reconstruction results – probability matrices (layer {sample.layer_id})'
+        title=f'Reconstruction results – probability matrices (layer {sample.layer_id})',
     )
     plt.savefig('output/fao_reconst_comparison.png', dpi=1200)
     plt.savefig('output/fao_reconst_comparison.svg')
@@ -159,6 +161,7 @@ def demo_random_single_layer(layer_id=None):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    pd.set_option('precision', 2)
     
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--layer_id', type=int, default=None,
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--num_seeds', type=int, default=2,
                         help='Number of random seeds')
     parser.add_argument('-w', '--num_workers', type=int, default=6)
-      
+
     args = parser.parse_args()
     
     if args.layer_id is not None:
