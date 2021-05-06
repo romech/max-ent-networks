@@ -3,6 +3,7 @@ from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
 import toolz
+from scipy.spatial.distance import jensenshannon
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error
 
 from sampling import LayerSplit
@@ -55,7 +56,9 @@ def check_constraints(sample, probability_matrix):
         s_in_mae=mean_absolute_error(s_in, _s_in),
         s_out_mae=mean_absolute_error(s_out, _s_out),
         s_in_mape=mean_absolute_percentage_error(s_in, _s_in, sample_weight=s_in),
-        s_out_mape=mean_absolute_percentage_error(s_out, _s_out, sample_weight=s_out)
+        s_out_mape=mean_absolute_percentage_error(s_out, _s_out, sample_weight=s_out),
+        s_in_js=jensenshannon(s_in, _s_in, base=2) ** 2,
+        s_out_js=jensenshannon(s_out, _s_out, base=2) ** 2
     )
 
 

@@ -21,6 +21,10 @@ mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
 
+METRICS_DISPLAY = ['f1', 'precision', 'recall',
+                   's_in_mape', 's_out_mape',
+                   's_in_js', 's_out_js']
+
 def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> LayerSplit:
     """
     Select random layer, then split its nodes into 'observed' and 'hidden' parts.
@@ -87,12 +91,11 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
         results_list,
         index=pd.MultiIndex.from_tuples(index_keys, names=['layer_id', 'name', 'seed']),
     )
-    metrics = ['f1', 'precision', 'recall', 's_in_mape', 's_out_mape']
     print('Stats by layer')
-    display(results_df[metrics].groupby(level=['layer_id', 'name']).agg(describe_mean_std))
+    display(results_df[METRICS_DISPLAY].groupby(level=['layer_id', 'name']).agg(describe_mean_std))
     
     print('Stats by method')
-    display(results_df[metrics].groupby(level=['name']).agg(describe_mean_std))
+    display(results_df[METRICS_DISPLAY].groupby(level=['name']).agg(describe_mean_std))
     return results_df
 
 
