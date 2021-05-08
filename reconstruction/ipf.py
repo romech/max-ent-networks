@@ -15,6 +15,7 @@ import logging
 import numpy as np
 import pandas as pd
 from tqdm.auto import trange
+from toolz import curry
 
 from sampling import LayerSplit, GraphData
 from utils import (empirical_strengths, matrix_intersetions, repeat_col,
@@ -61,11 +62,13 @@ def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
     return W_n
 
 
+@curry
 def reconstruct_layer_sample(
         sample: LayerSplit,
         marginalized: bool = True,
         s_in: np.ndarray = None,
-        s_out: np.ndarray = None) -> np.ndarray:
+        s_out: np.ndarray = None,
+        ipf_steps: int = 20) -> np.ndarray:
     """
     Run reconstruction routine given an experimantal sample.
     It is necessary for the IPF to initialize the weights
@@ -104,7 +107,7 @@ def reconstruct_layer_sample(
         else:
             W0[(u, v)] = edge.weight
     
-    Wn = reconstruct(W0, s_in, s_out)
+    Wn = reconstruct(W0, s_in, s_out, max_steps=ipf_steps)
     return Wn
 
 

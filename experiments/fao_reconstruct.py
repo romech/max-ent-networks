@@ -70,7 +70,8 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
     
     seeds = np.arange(num_seeds)
     experiments = [
-        ('Random', random_baseline.reconstruct_layer_sample),
+        # ('Random', random_baseline.reconstruct_layer_sample),
+        ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         ('IPF enforced', ipf.reconstruct_layer_sample),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
@@ -117,6 +118,7 @@ def demo_random_single_layer(layer_id=None):
     eval_res = OrderedDict()
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
+        ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         ('IPF enforced', ipf.reconstruct_layer_sample),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
@@ -148,7 +150,8 @@ def demo_random_single_layer(layer_id=None):
         ('Source\n(observed - yellow,\nhidden - pink)', demo_sample),
         ('IPF', predictions['IPF']),
         ('IPF\n(links enforced)', predictions['IPF enforced']),
-        ('Random', predictions['Random']),
+        # ('Random', random_baseline.reconstruct_layer_sample),
+        ('MaxEnt', predictions['MaxEnt']),
         ('DBCM', predictions['DBCM']),
         ('DBCM\n(links enforced)', predictions['DBCM enforced']),
     ]
