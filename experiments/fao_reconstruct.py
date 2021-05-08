@@ -6,7 +6,7 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
 from experiments.metrics import evaluate_reconstruction
@@ -71,9 +71,10 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
     seeds = np.arange(num_seeds)
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
-        ('IPF', ipf.reconstruct_layer_sample),
-        ('IPF unconscious', ipf.reconstruct_layer_sample_unconsciously),
-        ('DBCM', dbcm.reconstruct_layer_sample),
+        ('IPF', ipf.reconstruct_layer_sample_unconsciously),
+        ('IPF enforced', ipf.reconstruct_layer_sample),
+        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
+        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
     ]
     
     index_keys = []
@@ -183,11 +184,14 @@ if __name__ == '__main__':
     elif args.all:
         res = demo_evaluate_multiple_layers(num_seeds=args.num_seeds,
                                             num_workers=args.num_workers)
+        res.to_csv('output/eval_all.csv')
     elif args.layer_ids:
         res = demo_evaluate_multiple_layers(layer_ids=args.layer_ids,
                                             num_seeds=args.num_seeds,
                                             num_workers=args.num_workers)
+        res.to_csv('output/eval.csv')
     else:
         res = demo_evaluate_multiple_layers(n=args.n,
                                             num_seeds=args.num_seeds,
                                             num_workers=args.num_workers)
+        res.to_csv('output/eval.csv')

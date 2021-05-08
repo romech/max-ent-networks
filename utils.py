@@ -113,9 +113,9 @@ def verify_finite(arr):
 
 def describe_mean_std(data):
     if len(data) == 1:
-        return '{:.2f}'.format(data.mean())
+        return '{:.2g}'.format(data.mean())
     else:
-        return '{:.2f}±{:.2f}'.format(data.mean(), data.std())
+        return '{:.2g}±{:.2g}'.format(data.mean(), data.std())
 
 
 def edges_to_matrix(edges: pd.DataFrame,
