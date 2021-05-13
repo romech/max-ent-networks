@@ -22,7 +22,8 @@ mpl_logger.setLevel(logging.WARNING)
 
 
 METRICS_DISPLAY = ['f1', 'precision', 'recall',
-                   's_in_mape', 's_out_mape',
+                   'corr_in', 'corr_out',
+                   'p_val_in', 'p_val_out',
                    's_in_js', 's_out_js']
 
 def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> LayerSplit:
@@ -70,10 +71,11 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
     
     seeds = np.arange(num_seeds)
     experiments = [
-        # ('Random', random_baseline.reconstruct_layer_sample),
+        ('Random', random_baseline.reconstruct_layer_sample),
         ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         ('IPF enforced', ipf.reconstruct_layer_sample),
+        ('IPF v2', ipf.reconstruct_v2),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
         ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
     ]
@@ -88,7 +90,7 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
                 runs.append((sample, reconstruct_func))
     
     results_list = process_map(_run_single_eval, runs,
-                               chunksize=3, max_workers=num_workers)
+                               chunksize=3, max_workers=num_workers, smoothing=0)
     results_df = pd.DataFrame(
         results_list,
         index=pd.MultiIndex.from_tuples(index_keys, names=['layer_id', 'name', 'seed']),
@@ -120,7 +122,8 @@ def demo_random_single_layer(layer_id=None):
         ('Random', random_baseline.reconstruct_layer_sample),
         ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
-        ('IPF enforced', ipf.reconstruct_layer_sample),
+        # ('IPF enforced', ipf.reconstruct_layer_sample),
+        ('IPF enforced', ipf.reconstruct_v2),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
         ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
     ]

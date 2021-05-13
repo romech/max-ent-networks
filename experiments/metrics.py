@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import toolz
 from scipy.spatial.distance import jensenshannon
+from scipy.stats import spearmanr
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error
 
 from sampling import LayerSplit
@@ -52,13 +53,19 @@ def check_constraints(sample, probability_matrix):
     """
     _s_in = probability_matrix.sum(axis=1)
     _s_out = probability_matrix.sum(axis=0)
+    corr_in, p_val_in = spearmanr(s_in, _s_in)
+    corr_out, p_val_out = spearmanr(s_out, _s_out)
     return dict(
         s_in_mae=mean_absolute_error(s_in, _s_in),
         s_out_mae=mean_absolute_error(s_out, _s_out),
         s_in_mape=mean_absolute_percentage_error(s_in, _s_in, sample_weight=np.exp(s_in)),
         s_out_mape=mean_absolute_percentage_error(s_out, _s_out, sample_weight=np.exp(s_out)),
         s_in_js=jensenshannon(s_in, _s_in, base=2) ** 2,
-        s_out_js=jensenshannon(s_out, _s_out, base=2) ** 2
+        s_out_js=jensenshannon(s_out, _s_out, base=2) ** 2,
+        corr_in=corr_in,
+        corr_out=corr_out,
+        p_val_in=p_val_in,
+        p_val_out=p_val_out,
     )
 
 

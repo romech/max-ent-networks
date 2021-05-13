@@ -22,7 +22,9 @@ from utils import (empirical_strengths, matrix_intersetions, repeat_col,
                    repeat_row, verify_finite)
 
 
-def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
+ATOL = 1e-8
+
+def reconstruct(W, s_in, s_out, max_steps=20) -> np.ndarray:
     """
     Run reconstrution for all or selected nodes, and return a modified weight matrix.
     See chapter 3.1.2 in [1].
@@ -55,7 +57,7 @@ def reconstruct(W, s_in, s_out, max_steps=20, tol=1e-8) -> np.ndarray:
             return W_prev
         W_n = repeat_col(s_out, N) * (W_n / repeat_col(_s_out, N))
         
-        if np.allclose(W_n, W_prev, atol=tol):
+        if np.allclose(W_n, W_prev, atol=ATOL):
             steps_pbar.close()
             logging.debug(f'IPF converged in {step + 1} steps')
             break
@@ -124,6 +126,65 @@ def reconstruct_layer_sample_unconsciously(
                                     marginalized=marginalized,
                                     s_in=s_in,
                                     s_out=s_out)
+
+
+def reconstruct_v2(sample: LayerSplit,
+                   s_in: np.ndarray = None,
+                   s_out: np.ndarray = None,
+                   ipf_steps: int = 20) -> np.ndarray:
+    """
+    The same as before, but observed entries are fixed
+    """
+    if s_in is None:
+        s_in, s_out = empirical_strengths(
+            sample.full.edges,
+            sample.full.nodes,
+            marginalized=True
+        )
+    
+    W0 = _W_me(s_in, s_out)
+
+    observed_entries = matrix_intersetions(sample.observed.nodes,
+                                           index=sample.node_index)
+    W0[observed_entries] = 0
+    np.fill_diagonal(W0, 0)
+    fill_mask = W0 > 0
+
+    for edge in sample.observed.edges.itertuples():
+        u = sample.node_index[edge.node_1]
+        v = sample.node_index[edge.node_2]
+        W0[(u, v)] = 1
+        
+    N = len(s_in)
+    W_n = W0
+    
+    steps_pbar = trange(ipf_steps, desc='IPF steps', delay=3, leave=False)
+    for step in steps_pbar:
+        W_prev = W_n.copy()
+        
+        # STEP 1 - s_in. See eqn (15).
+        _s_in = W_n.sum(axis=0)
+        # Replacing some values with eps to avoid zero by zero division
+        _s_in = np.where(s_in > 0, _s_in, 1e-10)
+        if not verify_finite(_s_in):
+            return W_prev
+        W_n_upd = repeat_row(s_in, N) * (W_n / repeat_row(_s_in, N))
+        np.putmask(W_n, fill_mask, W_n_upd)
+        
+        # STEP 2 - s_out.
+        _s_out = W_n.sum(axis=1)
+        _s_out = np.where(s_out > 0, _s_out, 1e-10)
+        if not verify_finite(_s_out):
+            return W_prev
+        W_n_upd = repeat_col(s_out, N) * (W_n / repeat_col(_s_out, N))
+        np.putmask(W_n, fill_mask, W_n_upd)
+        
+        if np.allclose(W_n, W_prev, atol=ATOL):
+            steps_pbar.close()
+            logging.debug(f'IPF converged in {step + 1} steps')
+            break
+        
+    return W_n
 
 
 def _W_me(s_in, s_out):
