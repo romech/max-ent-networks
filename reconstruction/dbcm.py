@@ -11,6 +11,7 @@ Constraints: node degrees
 Physics Reports, vol. 757, pp. 1–47, Oct. 2018, doi: 10.1016/j.physrep.2018.06.008.
 """
 import logging
+import warnings
 
 import numpy as np
 from scipy.optimize import root_scalar
@@ -40,7 +41,11 @@ def reconstruct_layer_sample(
     get_observed_value = _get_oserved_value_func(sample)
     
     # Step 1 - Solving eqn. (46) for z
-    with tqdm(total=3, desc='Solving eqn for z', unit='step', smoothing=1, leave=False) as pbar:
+    with warnings.catch_warnings(), \
+         tqdm(total=3, desc='Solving eqn for z',
+              unit='step', smoothing=1, leave=False) as pbar:
+             
+        warnings.filterwarnings("ignore", message="Derivative was zero") 
         pbar.set_postfix_str('preparing equation')
         
         # The equation in solved numerically, but symbolic calculations
@@ -70,9 +75,7 @@ def reconstruct_layer_sample(
         f_with_primes = _as_function_with_primes(z, lhs, p_ij, order=sol_order)
         
         pbar.update()
-        # Solving numerically requires x0, so we try different values, just in case.
-        x0_estimates = np.logspace(1, np.log10(s_in.max() * s_out.max()), 10)
-        np.random.shuffle(x0_estimates)
+        x0_estimates = _get_x0_estimates(s_in, s_out)
         for trial, x0 in enumerate(x0_estimates, 1):
             pbar.set_postfix_str(f'trying x0={x0:.1e}')
             sol = root_scalar(
@@ -158,6 +161,13 @@ def _as_function_with_primes(z, lhs, p_ij, order=1):
     
     return f_df_d2f
 
+
+def _get_x0_estimates(s_in, s_out):
+    # Unsure about this. But I think this interval is wide enough to find soultion
+    x0_estimates = np.logspace(1, np.log10(s_in.max() * s_out.max()), 10)
+    np.random.shuffle(x0_estimates)
+    # The paper says that MECAPM uses z=1/|W|, so we give it a try first.
+    return [s_in.sum()] + x0_estimates.tolist()
 
 def _nan_fallback(_):
     return np.nan
