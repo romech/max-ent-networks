@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import toolz
 from scipy.sparse import csr_matrix
+from toolz import curry
 
 
 try:
@@ -111,11 +112,12 @@ def verify_finite(arr):
         logging.warning('Infinite value encoutered', stack_info=True)
     return False
 
-def describe_mean_std(data):
+@curry
+def describe_mean_std(data, num_fmt='{:.2g}'):
     if len(data) == 1:
-        return '{:.2g}'.format(data.mean())
+        return num_fmt.format(data.mean())
     else:
-        return '{:.2g}±{:.2g}'.format(data.mean(), data.std())
+        return (num_fmt + '±' + num_fmt).format(data.mean(), data.std())
 
 
 def edges_to_matrix(edges: pd.DataFrame,
