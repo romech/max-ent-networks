@@ -23,8 +23,14 @@ mpl_logger.setLevel(logging.WARNING)
 
 METRICS_DISPLAY = ['f1', 'precision', 'recall',
                    'corr_in', 'corr_out',
-                   'p_val_in', 'p_val_out',
-                   's_in_js', 's_out_js']
+                   'pv_in', 'pv_out',
+                   's_in_js', 's_out_js'
+                #    's_in_mae', 's_out_mae',
+                #    's_in_mape', 's_out_mape',
+                #    'r2_in', 'r2_out',
+                #    'spcorr_in', 'spcorr_out',
+                #    'sp_pv_in', 'sp_pv_out',
+                   ]
 
 def fao_layer_sample(layer_id=None, hidden_ratio=0.5, random_state=None) -> LayerSplit:
     """
@@ -74,8 +80,8 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
         ('Random', random_baseline.reconstruct_layer_sample),
         ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
-        ('IPF enforced', ipf.reconstruct_layer_sample),
-        ('IPF v2', ipf.reconstruct_v2),
+        # ('IPF enforced', ipf.reconstruct_layer_sample),
+        ('IPF enforced', ipf.reconstruct_v2),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
         ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
     ]
@@ -122,7 +128,6 @@ def demo_random_single_layer(layer_id=None):
         ('Random', random_baseline.reconstruct_layer_sample),
         ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
-        # ('IPF enforced', ipf.reconstruct_layer_sample),
         ('IPF enforced', ipf.reconstruct_v2),
         ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
         ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
@@ -179,7 +184,7 @@ if __name__ == '__main__':
                         help='Run experiments for n layers')
     parser.add_argument('-ll', '--layer_ids', type=int, nargs='*',
                         help='Run for selected layer ids')
-    parser.add_argument('-s', '--num_seeds', type=int, default=2,
+    parser.add_argument('-s', '--num_seeds', type=int, default=3,
                         help='Number of random seeds')
     parser.add_argument('-w', '--num_workers', type=int, default=6)
 
