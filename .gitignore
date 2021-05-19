@@ -2,7 +2,8 @@
 .pylintrc
 deliverables
 output
-cbs
+CBS
+FAO_dataset
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,vscode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,vscode
