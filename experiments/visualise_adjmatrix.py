@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -9,12 +9,13 @@ from utils import highlight_first_line
 
 
 def adjmatrix_figure(labelled_matrices: List[Tuple[str, np.ndarray]],
-                     title: str,
+                     title: Optional[str] = None,
                      figsize=(5.5, 4),
                      ncols=3):
     
     fig = plt.figure(figsize=figsize)
-    fig.suptitle(title)
+    if title is not None:
+        fig.suptitle(title)
     plt.axis('off')
     ncols = min(ncols, len(labelled_matrices))
     nrows = int(np.ceil(len(labelled_matrices) / ncols))

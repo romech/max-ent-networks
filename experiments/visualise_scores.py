@@ -15,7 +15,7 @@ METHOD_RENAMING = {
     'DBCM enforced': 'f-DBCM *',
     'IPF enforced': 'IPF *'
 }
-PLOT_METHODS = ('Random', 'MaxEnt', 'IPF enforced', 'DBCM enforced')
+PLOT_METHODS = ('MaxEnt', 'IPF enforced', 'DBCM enforced')
 LATEX_COLUMNS = {
     'f1': r'$F_1\text{-score}$',
     'precision': 'Precision',
@@ -28,7 +28,7 @@ LATEX_COLUMNS = {
     's_out_js': r'$JSD_\text{out}$',
     'delta_L': r'$\delta_L$'
 }
-METRICS_CAPTION = 'Binary classification metrics for layerwise reconstruction of {}'
+METRICS_CAPTION = 'Binary classification metrics for layer-wise reconstruction of {}'
 CONSTRAINTS_CAPTION = \
     'Mean values of constraint compliance metrics for layerwise reconstruction of {}'
 CONSTRAINT_COLS = ['corr_in', 'corr_out', 'pv_in', 'pv_out', 's_in_js', 's_out_js']
@@ -84,6 +84,7 @@ def generate_latex_summary(result_output: pd.DataFrame,
                            dataset_name: str):
     metrics = result_output\
         [result_output.name.isin(METHOD_SELECTION)]\
+        .dropna()\
         .groupby('name')
 
     rel_L_error = metrics\

@@ -78,12 +78,12 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
     seeds = np.arange(num_seeds)
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
-        ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
+        ('MaxEnt', ipf.reconstruct_layer_sample, ('ipf_steps', 0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         # ('IPF enforced', ipf.reconstruct_layer_sample),
         ('IPF enforced', ipf.reconstruct_v2),
-        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
-        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
+        ('DBCM', dbcm.reconstruct_layer_sample, ('enforce_observed', False)),
+        ('DBCM enforced', dbcm.reconstruct_layer_sample, ('enforce_observed', True)),
     ]
     
     index_keys = []
@@ -91,9 +91,9 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
     for layer_id in layer_ids:
         for seed in seeds:
             sample = fao_layer_sample(layer_id, random_state=seed)
-            for name, reconstruct_func in experiments:
+            for name, reconstruct_func, *kwargs in experiments:
                 index_keys.append((layer_id, name, seed))
-                runs.append((sample, reconstruct_func))
+                runs.append((sample, reconstruct_func, dict(kwargs)))
     
     results_list = process_map(_run_single_eval, runs,
                                chunksize=3, max_workers=num_workers, smoothing=0)
@@ -110,8 +110,8 @@ def demo_evaluate_multiple_layers(n=None, layer_ids=None, num_seeds=2, num_worke
 
 
 def _run_single_eval(params):
-    sample, reconstruct_func = params
-    p_ij = reconstruct_func(sample)
+    sample, reconstruct_func, kwargs = params
+    p_ij = reconstruct_func(sample, **kwargs)
     res = evaluate_reconstruction(sample, p_ij)
     return res
 
@@ -126,17 +126,17 @@ def demo_random_single_layer(layer_id=None):
     eval_res = OrderedDict()
     experiments = [
         ('Random', random_baseline.reconstruct_layer_sample),
-        ('MaxEnt', ipf.reconstruct_layer_sample(ipf_steps=0)),
+        ('MaxEnt', ipf.reconstruct_layer_sample, ('ipf_steps', 0)),
         ('IPF', ipf.reconstruct_layer_sample_unconsciously),
         ('IPF enforced', ipf.reconstruct_v2),
-        ('DBCM', dbcm.reconstruct_layer_sample(enforce_observed=False)),
-        ('DBCM enforced', dbcm.reconstruct_layer_sample(enforce_observed=True)),
+        ('DBCM', dbcm.reconstruct_layer_sample, ('enforce_observed', False)),
+        ('DBCM enforced', dbcm.reconstruct_layer_sample, ('enforce_observed', True)),
     ]
     
     with tqdm(experiments, desc='Reconstruction experiments') as experiments_pbar:
-        for name, reconstruction_func in experiments_pbar:
+        for name, reconstruction_func, *kwargs in experiments_pbar:
             experiments_pbar.set_postfix_str(name)
-            p_ij = reconstruction_func(sample)
+            p_ij = reconstruction_func(sample, **dict(kwargs))
             eval_res[name] = evaluate_reconstruction(sample, p_ij)
             predictions[name] = p_ij
     
@@ -155,17 +155,17 @@ def demo_random_single_layer(layer_id=None):
     demo_sample = (demo_sample * observed_mask).astype(np.float32) / 2
     
     res = [
-        ('Source\n(observed - yellow,\nhidden - pink)', demo_sample),
+        ('Source', demo_sample),
         ('IPF', predictions['IPF']),
-        ('IPF\n(links enforced)', predictions['IPF enforced']),
+        ('IPF *', predictions['IPF enforced']),
         # ('Random', random_baseline.reconstruct_layer_sample),
-        ('MaxEnt', predictions['MaxEnt']),
+        ('MaxEnt *', predictions['MaxEnt']),
         ('DBCM', predictions['DBCM']),
-        ('DBCM\n(links enforced)', predictions['DBCM enforced']),
+        ('DBCM *', predictions['DBCM enforced']),
     ]
     adjmatrix_figure(
         res,
-        title=f'Reconstruction results – probability matrices (layer {sample.layer_id})',
+        # title=f'Reconstruction results – probability matrices (layer {sample.layer_id})',
     )
     plt.savefig('output/fao_reconst_comparison.png', dpi=1200)
     plt.savefig('output/fao_reconst_comparison.svg')
