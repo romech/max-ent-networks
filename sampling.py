@@ -57,7 +57,7 @@ def random_layer_split(edges: pd.DataFrame,
         random_state=random_state
     )
     
-    edges_observed, edges_hidden = _partition_into_observed_and_hidden(edges, nodes_hidden)
+    edges_observed, edges_hidden = partition_into_observed_and_hidden(edges, nodes_hidden)
     node_index = {node_id: i for i, node_id in enumerate(nodes)}
     return LayerSplit(
         layer_id=layer_id,
@@ -84,7 +84,7 @@ def layer_split_with_no_observables(edges: pd.DataFrame, layer_id: int):
     )
     
 
-def _partition_into_observed_and_hidden(edges, nodes_hidden):
+def partition_into_observed_and_hidden(edges, nodes_hidden):
     is_hidden_edge = edges.node_1.isin(nodes_hidden) | edges.node_2.isin(nodes_hidden)
     edges_hidden = edges[is_hidden_edge]
     edges_observed = edges[~is_hidden_edge]
