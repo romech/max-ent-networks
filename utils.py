@@ -76,8 +76,23 @@ def sparse_pairwise_product_matrix(vect_1, vect_2):
     return sv1 @ sv2
     
 
-def probabilies_to_adjacency(matrix):
+def probabilies_to_adjacency(matrix: np.ndarray):
     return np.random.rand(*matrix.shape) < matrix
+
+
+def probabilies_to_adjacency_advanced(matrix: np.ndarray):
+    assert len(matrix.shape) == 2
+    adjmatrix = np.zeros_like(matrix, dtype=np.int8)
+    idx1d = np.random.permutation(matrix.shape[0] * matrix.shape[1])
+    idx_i, idx_j = np.unravel_index(idx1d, matrix.shape)
+    cumsum = 0
+    next_tick = np.random.rand()
+    for i, j in zip(idx_i, idx_j):
+        cumsum += matrix[i, j]
+        if cumsum > next_tick:
+            adjmatrix[i, j] = 1
+            next_tick += 1
+    return adjmatrix
 
 
 def matrix_intersetions(elements, index=None):

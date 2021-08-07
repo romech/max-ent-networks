@@ -9,7 +9,7 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error,
 
 from sampling import LayerSplit
 from utils import (display, empirical_strengths, matrix_intersetions,
-                   probabilies_to_adjacency)
+                   probabilies_to_adjacency_advanced)
 
 Edge = Tuple[int, int]
 
@@ -99,7 +99,7 @@ def evaluate_reconstruction(
     np.fill_diagonal(probability_matrix, 0)
     
     # Transforming probabilities into adjacency matrix and edge list
-    pred_matrix = probabilies_to_adjacency(probability_matrix)
+    pred_matrix = probabilies_to_adjacency_advanced(probability_matrix)
     pred_edges_src, pred_edges_dst = pred_matrix.nonzero()
     pred_edges = list(zip(pred_edges_src, pred_edges_dst))
     
