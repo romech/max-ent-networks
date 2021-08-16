@@ -11,6 +11,7 @@ Physics Reports, vol. 757, pp. 1–47, Oct. 2018, doi: 10.1016/j.physrep.2018.06
 """
 
 import logging
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -129,8 +130,8 @@ def reconstruct_layer_sample_unconsciously(
 
 
 def reconstruct_v2(sample: LayerSplit,
-                   s_in: np.ndarray = None,
-                   s_out: np.ndarray = None,
+                   s_in: Optional[np.ndarray] = None,
+                   s_out: Optional[np.ndarray] = None,
                    ipf_steps: int = 20) -> np.ndarray:
     """
     The same as before, but observed entries are fixed
@@ -169,6 +170,7 @@ def reconstruct_v2(sample: LayerSplit,
         if not verify_finite(_s_in):
             return W_prev
         W_n_upd = repeat_row(s_in, N) * (W_n / repeat_row(_s_in, N))
+        W_n_upd = np.clip(W_n_upd, 0, 1)
         np.putmask(W_n, fill_mask, W_n_upd)
         
         # STEP 2 - s_out.
@@ -177,6 +179,7 @@ def reconstruct_v2(sample: LayerSplit,
         if not verify_finite(_s_out):
             return W_prev
         W_n_upd = repeat_col(s_out, N) * (W_n / repeat_col(_s_out, N))
+        W_n_upd = np.clip(W_n_upd, 0, 1)
         np.putmask(W_n, fill_mask, W_n_upd)
         
         if np.allclose(W_n, W_prev, atol=ATOL):

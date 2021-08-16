@@ -8,10 +8,8 @@ from scipy.stats import spearmanr, pearsonr
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error, r2_score
 
 from sampling import LayerSplit
-from utils import (display, empirical_strengths, matrix_intersetions,
-                   probabilies_to_adjacency_advanced)
-
-Edge = Tuple[int, int]
+from utils import (Edge, adjmatrix_to_edgelist, display, empirical_strengths,
+                   matrix_intersetions, probabilies_to_adjacency_exact)
 
 
 def binary_classification_metrics(target: Iterable[Edge], pred: Iterable[Edge]):
@@ -19,6 +17,7 @@ def binary_classification_metrics(target: Iterable[Edge], pred: Iterable[Edge]):
     pred = set(pred)
     num_expected = len(target)
     num_predicted = len(pred)
+    L_mape = mean_absolute_percentage_error([num_expected], [num_predicted])
     
     tp = len(target & pred)
     fp = len(pred - target)
@@ -40,7 +39,9 @@ def binary_classification_metrics(target: Iterable[Edge], pred: Iterable[Edge]):
     else:
         f1 = 0
     return dict(precision=precision, recall=recall, f1=f1,
-                num_expected=num_expected, num_predicted=num_predicted)
+                num_expected=num_expected,
+                num_predicted=num_predicted,
+                L_mape=L_mape)
 
 
 def check_constraints(sample, probability_matrix):
@@ -99,9 +100,8 @@ def evaluate_reconstruction(
     np.fill_diagonal(probability_matrix, 0)
     
     # Transforming probabilities into adjacency matrix and edge list
-    pred_matrix = probabilies_to_adjacency_advanced(probability_matrix)
-    pred_edges_src, pred_edges_dst = pred_matrix.nonzero()
-    pred_edges = list(zip(pred_edges_src, pred_edges_dst))
+    pred_matrix = probabilies_to_adjacency_exact(probability_matrix)
+    pred_edges = adjmatrix_to_edgelist(pred_matrix)
     
     metrics = binary_classification_metrics(target_edges, pred_edges)
     metrics.update(constr_metrics)
