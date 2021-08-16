@@ -19,6 +19,11 @@ except ImportError:
     display = print
     
 
+NodeLabel = Union[int, str]
+Edge = Tuple[NodeLabel, NodeLabel]
+IndexMapper = Dict[Hashable, int]
+
+
 def replace_underscores(string):
     return string.replace('_', ' ')
 
@@ -28,7 +33,10 @@ def fallback(f):
     Recover from any exception, print traceback, and return None.
     """
     
-    return toolz.excepts(Exception, f, lambda _: traceback.print_exc())
+    return toolz.excepts(Exception, f, _fallback_exc)
+
+def _fallback_exc(e):
+    traceback.print_exc()
 
 
 def put_col_in_front(df, col):
@@ -76,11 +84,11 @@ def sparse_pairwise_product_matrix(vect_1, vect_2):
     return sv1 @ sv2
     
 
-def probabilies_to_adjacency(matrix: np.ndarray):
+def probabilies_to_adjacency(matrix: np.ndarray) -> np.ndarray:
     return np.random.rand(*matrix.shape) < matrix
 
 
-def probabilies_to_adjacency_advanced(matrix: np.ndarray):
+def probabilies_to_adjacency_exact(matrix: np.ndarray) -> np.ndarray:
     assert len(matrix.shape) == 2
     adjmatrix = np.zeros_like(matrix, dtype=np.int8)
     idx1d = np.random.permutation(matrix.shape[0] * matrix.shape[1])
@@ -95,6 +103,24 @@ def probabilies_to_adjacency_advanced(matrix: np.ndarray):
     return adjmatrix
 
 
+def adjmatrix_to_edgelist(matrix: np.ndarray) -> List[Edge]:
+    src, dst = matrix.nonzero()
+    edges = list(zip(src, dst))
+    return edges
+
+
+def adjmatrix_to_df(matrix: np.ndarray,
+                    node_index: IndexMapper,
+                    layer_id: int) -> pd.DataFrame:
+    edgelist = adjmatrix_to_edgelist(matrix)
+    edges = pd.DataFrame(edgelist, columns=['node_1', 'node_2'])
+    node_labels = sorted(node_index.keys())
+    edges['node_1'] = edges.node_1.apply(node_labels.__getitem__)
+    edges['node_2'] = edges.node_2.apply(node_labels.__getitem__)
+    edges['layer_id'] = layer_id
+    return edges
+
+
 def matrix_intersetions(elements, index=None):
     if isinstance(index, abc.Mapping):
         elements = toolz.get(elements, index)
@@ -104,7 +130,7 @@ def matrix_intersetions(elements, index=None):
     return np.ix_(elements, elements)
 
 
-def index_elements(elements: Iterable[Hashable]) -> Dict[Hashable, int]:
+def index_elements(elements: Iterable[Hashable]) -> IndexMapper:
     return {elem: i for i, elem in enumerate(elements)}
 
 

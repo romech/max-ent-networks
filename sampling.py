@@ -1,15 +1,13 @@
 """
 Module for splitting a graph layer into 'obesrved' and 'hidden' parts
 """
-from typing import Dict, List, NamedTuple, Optional, Union
+from typing import Dict, List, NamedTuple, Optional
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from utils import display, node_set
+from utils import NodeLabel, display, node_set
 
-
-NodeLabel = Union[int, str]
 
 class GraphData(NamedTuple):
     edges: pd.DataFrame

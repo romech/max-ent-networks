@@ -137,6 +137,7 @@ if __name__ == '__main__':
     plt.savefig('output/fao_f1.svg')
     plt.close()
     
+    plt.figure(figsize=(6, 4.05))
     plot_error_for_L(eval_res)
     plt.savefig('output/fao_L_err.png', dpi=600)
     plt.savefig('output/fao_L_err.svg')

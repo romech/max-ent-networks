@@ -1,14 +1,16 @@
 """
 Module for splitting a graph layer into 'obesrved' and 'hidden' parts
 """
+from functools import reduce
+from operator import and_
 from typing import Dict, List, NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
 from skmultilearn.model_selection import iterative_train_test_split
 
-from sampling import partition_into_observed_and_hidden, GraphData, NodeLabel
-from utils import display, node_set, filter_by_layer, edges_to_matrix, index_elements
+from sampling import partition_into_observed_and_hidden, GraphData, LayerSplit
+from utils import display, node_set, filter_by_layer, edges_to_matrix, index_elements, NodeLabel
 
 
 class MultiLayerSplit(NamedTuple):
@@ -19,37 +21,49 @@ class MultiLayerSplit(NamedTuple):
     full: GraphData
     
     def print_summary(self):
-        summary = pd.DataFrame.from_dict({
-                'nodes': {
-                    'total': len(self.full.nodes),
-                    'observed': len(self.observed.nodes),
-                    'hidden': len(self.hidden.nodes),
-                },
-                'edges': {
-                    'total': len(self.full.edges),
-                    'observed': len(self.observed.edges),
-                    'hidden': len(self.hidden.edges),
-                }
-            }, orient='index')\
-            .append(pd.concat([
-                self.full.edges.layer_id.value_counts().rename('total'),
-                self.observed.edges.layer_id.value_counts().rename('observed'),
-                self.hidden.edges.layer_id.value_counts().rename('hidden')],
-                axis=1).rename('layer {}'.format, axis='index')
-            )
+        # TODO: display number of common and unique nodes
+        layer_splits = [self.select_single(layer_id, all_nodes=False)
+                        for layer_id in self.layer_ids]
+        # num_common_nodes = {u for layer_split in layer_splits for u in layer_split.node_index.keys()}
+        node_sets = (layer_split.node_index.keys() for layer_split in layer_splits)
+        num_common_nodes = len(reduce(and_, node_sets))
+        display(f'PRINTING SUMMARY FOR LAYERS {self.layer_ids}')
+        display('Total {} nodes, {} are common.'.format(len(self.node_index), num_common_nodes))
         
-        summary['obs.ratio'] = summary.observed / summary.total
-        
-        display(f'Summary of random split. Layer ids: {self.layer_ids}')
-        display(summary)
+        for layer_split in layer_splits:
+            display('---------')
+            layer_split.print_summary()
     
     @property
     def n(self):
         return len(self.node_index)
     
+    def select_single(self, layer_id: int, all_nodes: bool) -> LayerSplit:
+        e_obs = filter_by_layer(self.observed.edges, layer_id)
+        e_hid = filter_by_layer(self.hidden.edges, layer_id)
+        e_full = filter_by_layer(self.full.edges, layer_id)
+        if all_nodes:
+            v_obs = self.observed.nodes
+            v_hid = self.hidden.nodes
+            v_full = self.full.nodes
+            node_index = self.node_index
+        else:
+            v_obs = sorted(node_set(e_obs))
+            v_hid = sorted(node_set(e_hid))
+            v_full = sorted(node_set(e_full))
+            node_index = index_elements(v_full)
+        
+        return LayerSplit(
+            layer_id=layer_id,
+            node_index=node_index,
+            observed=GraphData(edges=e_obs, nodes=v_obs),
+            hidden=GraphData(edges=e_hid, nodes=v_hid),
+            full=GraphData(edges=e_full, nodes=v_full),
+        )
+    
 
 def multilayer_sample(edges: pd.DataFrame,
-                      layer_ids: List[NodeLabel],
+                      layer_ids: List[int],
                       hidden_ratio: float = 0.5,
                       random_state: Optional[int] = None) -> MultiLayerSplit:
     """
@@ -79,8 +93,8 @@ def multilayer_sample(edges: pd.DataFrame,
         iterative_train_test_split(np.array(nodes).reshape(-1, 1),
                                    node_layers,
                                    test_size=hidden_ratio)
-    nodes_observed = nodes_observed.flatten()
-    nodes_hidden = nodes_hidden.flatten()
+    nodes_observed = nodes_observed.flatten().tolist()
+    nodes_hidden = nodes_hidden.flatten().tolist()
     edges_observed, edges_hidden = partition_into_observed_and_hidden(edges, nodes_hidden)
     split = MultiLayerSplit(
         layer_ids=layer_ids,
