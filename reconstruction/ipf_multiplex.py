@@ -74,7 +74,7 @@ def two_layer_multiplexity_tuning(P_a: np.ndarray,
                   target_common, p11.sum(), np.count_nonzero(a_common), k)
     return adj_a, adj_b
 
-
+  
 def _get_rescaled_probabilities(P_a, P_b, Pm, kappa_matrix):
     """
     Compute joint probabilities for every possible outcome:
