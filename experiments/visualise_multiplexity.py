@@ -7,17 +7,15 @@ import pandas as pd
 import seaborn as sns
 from joblib import Memory
 from scipy.spatial.distance import squareform
-from tqdm.auto import tqdm
+from scipy.stats import wilcoxon
 from tqdm.contrib.concurrent import process_map
 
 import fao_data
 from multiplex.correlation_metrics import multiplexity
 
 
-REPORT_CSV_FAO_OLD = 'output/mltplx_report.csv'
 REPORT_CSV_FAO = 'output/fao_report_all.csv'
 memory = Memory('.cache/', verbose=2)
-
 
 
 def flatten_df_for_seaborn(df: pd.DataFrame,
@@ -62,11 +60,11 @@ def multiplexity_error_plots(report_csv):
              'tuned mltplx mae', 'tuned mltplx mape'])
     mae_df = flatten_df_for_seaborn(df, {
         'baseline mltplx mae': 'Baseline approach',
-        'tuned mltplx mae': 'Multiplexity-tuned'
+        'tuned mltplx mae': 'Multiplexity fitting'
     })
     mape_df = flatten_df_for_seaborn(df, {
         'baseline mltplx mape': 'Baseline approach',
-        'tuned mltplx mape': 'Multiplexity-tuned'
+        'tuned mltplx mape': 'Multiplexity fitting'
     })
     sns.set_theme(style="ticks")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4.5))
@@ -87,6 +85,7 @@ def multiplexity_error_plots(report_csv):
     ax2.set_title('Relative error of multiplexity value')
     ########
     fig.tight_layout(pad=2.)
+    plt.savefig('output/mltplx.png', dpi=1200)
     plt.savefig('output/mltplx.svg')
     plt.show()
 
@@ -164,6 +163,7 @@ def plot_multiplexity_histogram(dataset=None):
     ax.axes.yaxis.set_ticks([])
     plt.tight_layout()
     plt.savefig('output/mltplx_hist.svg')
+    plt.savefig('output/mltplx_hist.png', dpi=1200)
     plt.show()
 
 
@@ -182,12 +182,11 @@ def plot_mltplx_gain(report_csv):
     ax.fig.suptitle('Effect of multiplexity tuning approach')
     ax.fig.tight_layout()
     plt.savefig('output/mltplx_gain.svg')
+    plt.savefig('output/mltplx_gain.png', dpi=1200)
     plt.show()
 
 
-def compute_metrics(report_csv):
-    from scipy.stats import wilcoxon
-    
+def compute_metrics(report_csv):    
     df = pd.read_csv(report_csv)
     df = drop_extreme_outliers(df, ['baseline mltplx mape', 'tuned mltplx mape'])
     print(df[['baseline mltplx mae', 'baseline mltplx mape',
@@ -204,8 +203,8 @@ def compute_metrics(report_csv):
     }
     print(pd.Series(analysis))
     
-    print('H0: mean = 0', wilcoxon(df['f1 increase'])[1])
-    print('H0: mean < 0', wilcoxon(df['f1 increase'], alternative='greater')[1])
+    print('H0: mean = 0. p-value =', wilcoxon(df['f1 increase'])[1])
+    print('H0: mean < 0. p-value =', wilcoxon(df['f1 increase'], alternative='greater')[1])
 
 if __name__ == '__main__':
     compute_multiplexity = memory.cache(compute_multiplexity)
@@ -213,7 +212,7 @@ if __name__ == '__main__':
     # 1. Box plots showing that multiplexity tuning approach yields
     # more truthful multiplexity scores
     
-    # multiplexity_error_plots(REPORT_CSV_FAO)
+    multiplexity_error_plots(REPORT_CSV_FAO)
     
     # 2.1. Multiplexity heatmap
     # plot_multiplexity()
@@ -222,10 +221,10 @@ if __name__ == '__main__':
     # plot_multiplexity_histogram()
     
     # 3. Plot multiplexity tuning approach gains
-    # plot_mltplx_gain(REPORT_CSV_FAO)
+    plot_mltplx_gain(REPORT_CSV_FAO)
     
     # 4. Metrics
-    # compute_metrics(REPORT_CSV_FAO)
+    compute_metrics(REPORT_CSV_FAO)
     
     
     # illustrations_for_tuning_algo()

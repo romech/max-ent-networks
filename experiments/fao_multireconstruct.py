@@ -5,22 +5,19 @@ import random
 from contextlib import redirect_stdout
 from datetime import datetime
 from itertools import combinations
-from typing import List, Optional, Union
+from typing import List, Optional
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from tqdm.auto import tqdm, trange
+from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
 from experiments.metrics import evaluate_reconstruction
-from experiments.visualise_adjmatrix import adjmatrix_figure
+from experiments.visualise_multiplexity import compute_metrics
 from fao_data import load_dataset
-from reconstruction import ipf, ipf_multiplex, random_baseline
-from multiplex.correlation_metrics import count_common_links, multiplexity, multiplexity_eval_metrics
+from reconstruction import ipf_multiplex
+from multiplex.correlation_metrics import count_common_links, multiplexity_eval_metrics
 from multiplex.multilayer_sampling import MultiLayerSplit, multilayer_sample
-from utils import (adjmatrix_to_df, adjmatrix_to_edgelist, display, edges_to_matrix, fallback, filter_by_layer,
-                   index_elements, matrix_intersetions, describe_mean_std)
+from utils import adjmatrix_to_df, display, filter_by_layer
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -28,11 +25,10 @@ logging.basicConfig(level=logging.DEBUG,
                     datefmt='%m-%d %H:%M:%S',
                     filename='output/log/fao_multireconstruct.log',
                     filemode='a')
-mpl_logger = logging.getLogger('matplotlib')
-mpl_logger.setLevel(logging.WARNING)
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
@@ -136,8 +132,7 @@ def demo_single_run_silent(layer_ids=None):
         except ValueError as e:
             if str(e) != 'probabilities do not sum to 1':
                 raise e
-            else:
-                return None
+            return None
 
 
 def evaluate_many(n='all', workers=0):
@@ -167,55 +162,32 @@ def evaluate_many(n='all', workers=0):
             
     df = pd.DataFrame.from_records(reports)
     df.to_csv(output_file, index=False)
-    
-    analysis = {
-        'Improvement in multiplexity MAE':
-            np.quantile(df['baseline mltplx mae'].values - df['tuned mltplx mae'].values, 0.5),
-        'Improvement in multiplexity MAPE':
-            np.quantile(df['baseline mltplx mape'].values - df['tuned mltplx mape'].values, 0.5),
-        'Improvement in F1 (relative)': df['f1 increase'].mean()
-    }
-    print(pd.Series(analysis))
+    compute_metrics(output_file)
     return df
 
     
 if __name__ == '__main__':
     pd.set_option('precision', 2)
     
-    # evaluate_many(10, workers=2)
-    evaluate_many(workers=4)
-    
-    # print(demo_single_run())
-    # print(demo_single_run([119, 279]))
-    
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-l', '--layer_id', type=int, default=None,
-    #                     help='Run single experiment with specified layer_id')
-    # parser.add_argument('-a', '--all', action='store_true',
-    #                     help='Run experiments for all layers')
-    # parser.add_argument('-n', type=int, default=30,
-    #                     help='Run experiments for n layers')
-    # parser.add_argument('-ll', '--layer_ids', type=int, nargs='*',
-    #                     help='Run for selected layer ids')
-    # parser.add_argument('-s', '--num_seeds', type=int, default=3,
-    #                     help='Number of random seeds')
-    # parser.add_argument('-w', '--num_workers', type=int, default=6)
+    parser = argparse.ArgumentParser(
+        description='Run multi-layer reconstruction experiments for the FAO Network. '
+                    'Results are stored as `output/fao_report_*.csv`')
+    parser.add_argument('-a', '--all', action='store_true',
+                        help='Run experiments for all possible pairs of layers')
+    parser.add_argument('-s', '--single', action='store_true',
+                        help='Run single experiment verbosely')
+    parser.add_argument('-n', type=int,
+                        help='Run experiments for n random samples')
+    parser.add_argument('-w', '--num_workers', type=int, default=6,
+                        help='Number of workers for parallel execution. '
+                             'Use 0 to turn this off.')
+    args = parser.parse_args()
 
-    # args = parser.parse_args()
-    
-    # if args.layer_id is not None:
-    #     demo_random_single_layer(args.layer_id)
-    # elif args.all:
-    #     res = demo_evaluate_multiple_layers(num_seeds=args.num_seeds,
-    #                                         num_workers=args.num_workers)
-    #     res.to_csv('output/eval_all.csv')
-    # elif args.layer_ids:
-    #     res = demo_evaluate_multiple_layers(layer_ids=args.layer_ids,
-    #                                         num_seeds=args.num_seeds,
-    #                                         num_workers=args.num_workers)
-    #     res.to_csv('output/eval.csv')
-    # else:
-    #     res = demo_evaluate_multiple_layers(n=args.n,
-    #                                         num_seeds=args.num_seeds,
-    #                                         num_workers=args.num_workers)
-    #     res.to_csv('output/eval.csv')
+    if args.single:
+        print(demo_single_run())
+    elif args.all:
+        evaluate_many(n='all', workers=args.num_workers)
+    elif args.n is not None:
+        evaluate_many(n=args.n, workers=args.num_workers)
+    else:
+        parser.error('Please specify any of the arguments: --all / --single / -n')
