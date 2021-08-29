@@ -4,11 +4,11 @@ Code accompanying master's thesis.
 
 Author: *Roman Aleksandrov*
 
-Title: *"Development of a Link Reconstruction Method for Multiplex Networks"*
-
-*University of Amsterdam, 2021*
+Title: *"Development of a Link Reconstruction Method for Multiplex Networks"*, (University of Amsterdam, 2021).
 
 A pdf link will be added later.
+
+Note that there is another Python package [NEMtropy](https://github.com/nicoloval/NEMtropy) which is probably a better solution for out-of-the-box single-layer network reconstruction.
 
 ## Data
 
