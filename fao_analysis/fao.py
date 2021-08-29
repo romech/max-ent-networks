@@ -7,9 +7,9 @@ from joblib import Memory
 from sklearn.cluster import OPTICS, AgglomerativeClustering
 from tqdm import tqdm
 
-from cluster_analysis import demo_elbow_method, try_clustering
 from fao_data import load_all_layers, load_dataset
-from intra_layer import pairwise_multiplexity
+from fao_analysis.cluster_analysis import demo_elbow_method, try_clustering
+from fao_analysis.inter_layer import pairwise_multiplexity
 from utils import (display, node_set_size, put_col_in_front,
                    replace_underscores, extract_clustered_table)
 
@@ -125,7 +125,7 @@ def demo_clustering():
 
 
 def demo_clustering_coef(plot=True, num_workers=4):
-    from nx_toolset import clust_coef_by_layer
+    from fao_analysis.nx_toolset import clust_coef_by_layer
     
     label_clust = 'clustering coefficient'
     label_links = 'number of links'
