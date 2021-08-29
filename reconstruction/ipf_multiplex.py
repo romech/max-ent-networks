@@ -51,44 +51,67 @@ def two_layer_multiplexity_tuning(P_a: np.ndarray,
     if not (verify_finite(P_a) and verify_finite(P_b)):
         raise ValueError('Probability matrices P_a, P_b contain unexpected values')
     
-    # Pm = P_a * P_b
-    # fulfilled_common = Pm[Pm==1].sum()
-    # expected_additionally = Pm[Pm<1].sum()
-    # if np.abs(expected_additionally) < 1e-6:
-    #     k = 1
-    # elif expected_additionally < 0:
-    #     logging.info('Unusual case: target number of common links '
-    #                  'is less than predicted using baseline')
-    #     k = target_common / Pm.sum()
-    # else:
-    #     k = (target_common - fulfilled_common) / expected_additionally
     Pm = P_a * P_b
-    upper_bounds = np.minimum(P_a, P_b)
-    if upper_bounds.sum() < target_common:
-        logging.info('Target number of common links is unreachable')
+    
+    # Defining constraints for every kappa_ij.
+    # Ignoring zero dvision because these values are replaced.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        min_kappa = np.where(Pm > 0, (P_a + P_b - 1) / Pm, np.zeros_like(Pm))
+        max_kappa = np.where(Pm > 0, np.minimum(1 / P_a, 1 / P_b), np.zeros_like(Pm))
+    
     if target_common > 0:
-        k = _find_opt_k(Pm, upper_bounds, target_common)
+        k = _find_opt_k(Pm, min_kappa, max_kappa, target_common)
     else:
         k = 1
     logging.debug("Correction coefficient %.3f", k)
-    p11 = np.clip(np.minimum(Pm * k, upper_bounds), 0, 1)
-    p01 = P_b - p11
-    p10 = P_a - p11
-    p00 = np.clip(1 - (p01 + p10 + p11), 0, 1)
-    assert all(map(verify_finite, (p00, p01, p10, p11)))
-    
-    if not np.allclose(p00 + p01 + p10 + p11, np.ones_like(p00), atol=1e-6):
-        logging.warning("Probabilities don't add up to 1")
+    kappa_matrix = _get_kappa_matrix(k, min_kappa, max_kappa)
+    p00, p01, p10, p11 = _get_rescaled_probabilities(P_a, P_b, Pm, kappa_matrix)
         
-    adj_a, adj_b = sample_joint_proba(p00, p01, p10, p11)
+    adj_a, adj_b = _sample_joint_proba(p00, p01, p10, p11)
     a_common = adj_a * adj_b
     
     logging.debug("Common links: ground truth %d, expected value %.1f, generated %d, k=%.2f",
                   target_common, p11.sum(), np.count_nonzero(a_common), k)
     return adj_a, adj_b
 
+  
+def _get_rescaled_probabilities(P_a, P_b, Pm, kappa_matrix):
+    """
+    Compute joint probabilities for every possible outcome:
+    p00 - no links between a pair of nodes
+    p01 - only layer `b` contains a link
+    p10 - only layer `a` contains a link
+    p11 - both layers contain a link
 
-def sample_joint_proba(p00, p01, p10, p11) -> MatrixPair:
+    Args:
+        P_a, P_b (NxN matrices): Probabilistic adjacency matrices
+        Pm (NxN matrix): Basically P_a*P_b
+        kappa_matrix (NxN matrix): Correction coefficient matrix
+
+    Returns:
+        p00, p01, p10, p11 (NxN matrices)
+    """
+    p11 = Pm * kappa_matrix
+    p01 = P_b - p11
+    p10 = P_a - p11
+    p00 = 1 - (p01 + p10 + p11)
+    
+    # Due to numeric computations, some values exceed bounds a bit.
+    # But large deviations might be caused by something else.
+    assert (p00 >= -1e-10).all()
+    assert (p01 >= -1e-10).all()
+    assert (p10 >= -1e-10).all()
+    assert all(map(verify_finite, (p00, p01, p10, p11))), 'nan or inf values are not ok'
+    
+    p01 = np.clip(p01, 0, 1)
+    p10 = np.clip(p10, 0, 1)
+    p00 = np.clip(p00, 0, 1)
+    if not np.allclose(p00 + p01 + p10 + p11, 1, atol=1e-8):
+        logging.warning("Probabilities don't add up to 1")
+    return p00, p01, p10, p11
+
+
+def _sample_joint_proba(p00, p01, p10, p11) -> MatrixPair:
     n = p00.shape[0]
     adj_a = np.empty_like(p00, dtype=np.int8)
     adj_b = np.empty_like(p00, dtype=np.int8)
@@ -101,16 +124,49 @@ def sample_joint_proba(p00, p01, p10, p11) -> MatrixPair:
     return adj_a, adj_b
 
 
-def _find_opt_k(Pm, upper_bounds, target_common, max_steps=10):
+def _find_opt_k(Pm, min_kappa, max_kappa, target_common, max_steps=20):
     k0 = target_common / Pm.sum()
     
-    def f(k):
-        expected_common = np.minimum(Pm * k, upper_bounds).sum()
+    def absolute_error_in_mutual_links(k):
+        rescaled_prob = Pm * _get_kappa_matrix(k, min_kappa, max_kappa)
+        expected_common = rescaled_prob.sum()
         return target_common - expected_common
     
-    sol = root_scalar(f, x0=k0, x1=k0*2, xtol=0.5, rtol=0.001, maxiter=max_steps)
+    max_k = max_kappa.max()
+    y0 = absolute_error_in_mutual_links(k0)
+    y1 = absolute_error_in_mutual_links(max_k)
+    if y0 == 0:
+        return k0
+    if y1 == 0:
+        return max_k
+    if y1 > 0:
+        logging.info('Target number of common links is unreachable')
+        return max_k
+    
+    # Need to define such lower bound that function signs on bounds are opposite
+    if np.sign(y0) * np.sign(y1) > 0:
+        k0 = 0
+    
+    try:
+        sol = root_scalar(
+            absolute_error_in_mutual_links,
+            x0=k0,
+            bracket=(k0, max_k),
+            xtol=0.5,
+            rtol=0.001,
+            maxiter=max_steps)
+    except ValueError as e:
+        logging.error('Caught exception while solving the equation for k: %s', e)
+        return k0
+        
     if sol.converged:
         return sol.root
     else:
         print(sol)
-        return k0
+        logging.info("Didn't converge. Expected L error: %.2f",
+                     absolute_error_in_mutual_links(sol.root))
+        return sol.root
+
+
+def _get_kappa_matrix(k, min_kappa, max_kappa):
+    return np.clip(np.full_like(min_kappa, k), min_kappa, max_kappa)

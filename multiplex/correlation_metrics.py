@@ -50,7 +50,7 @@ def multiplexity_eval_metrics(sample: MultiLayerSplit,
     
     res = dict(
         mltplx_tgt=orig_mltplx,
-        mktplx_pred=pred_mltplx,
+        mltplx_pred=pred_mltplx,
         mltplx_mae=mean_absolute_error([orig_mltplx], [pred_mltplx]),
         mltplx_mape=mean_absolute_percentage_error([orig_mltplx], [pred_mltplx]),
         mltrcp_mae=mean_absolute_error([orig_mltrcp], [pred_mltrcp]),
